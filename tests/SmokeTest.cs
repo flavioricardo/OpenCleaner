@@ -1,0 +1,150 @@
+// Teste de fumaça: compilado junto com src/ por tests\run-smoke.ps1.
+// Nada fora da pasta sandbox é apagado: as regras reais só são ANALISADAS.
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Windows.Forms;
+using FreeCleaner.Core;
+
+static class SmokeTest
+{
+    static int failures;
+
+    static void Check(bool cond, string what)
+    {
+        Console.WriteLine((cond ? "  [ok]   " : "  [FALHA] ") + what);
+        if (!cond) failures++;
+    }
+
+    [STAThread]
+    static int Main(string[] args)
+    {
+        string outDir = args.Length > 0 ? args[0] : ".";
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+        Console.WriteLine("== Regras ==");
+        var settings = new AppSettings(); // padrão, sem ler o ini do usuário
+        var rules = RuleCatalog.LoadAll(settings);
+        Console.WriteLine("  total: " + rules.Count);
+        foreach (var g in rules.GroupBy(r => r.Category)) Console.WriteLine("  " + g.Key + ": " + g.Count());
+        Check(rules.Count > 40, "mais de 40 regras embutidas");
+        Check(rules.Select(r => r.Id).Distinct().Count() == rules.Count, "ids de regra únicos");
+
+        var sw = Stopwatch.StartNew();
+        var detected = rules.Where(r => r.IsDetected()).ToList();
+        Console.WriteLine("  detectadas: " + detected.Count + " em " + sw.ElapsedMilliseconds + " ms");
+        Console.WriteLine("  grupos detectados: " + string.Join(", ", detected.Select(r => r.Group).Distinct()));
+
+        Console.WriteLine("== Análise (somente leitura) de todas as regras detectadas ==");
+        var engine = new CleanerEngine(settings);
+        long total = 0;
+        sw.Restart();
+        foreach (var r in detected)
+        {
+            var res = engine.Analyze(r);
+            total += res.Bytes;
+            if (res.ItemCount > 0 || res.Note != null)
+                Console.WriteLine(string.Format("  {0,-55} {1,6} itens {2,10}  {3}", r.FullName, res.ItemCount, Util.FormatSize(res.Bytes), res.Note));
+        }
+        Console.WriteLine("  total recuperável: " + Util.FormatSize(total) + " (" + sw.ElapsedMilliseconds + " ms)");
+
+        Console.WriteLine("== Limpeza real em sandbox ==");
+        string sandbox = Path.Combine(Path.GetTempPath(), "FreeCleanerSmoke_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(sandbox, @"Perfil 1\Cache\sub"));
+        Directory.CreateDirectory(Path.Combine(sandbox, @"Perfil 2\Cache"));
+        Directory.CreateDirectory(Path.Combine(sandbox, @"keep"));
+        File.WriteAllText(Path.Combine(sandbox, @"Perfil 1\Cache\a.tmp"), new string('x', 1000));
+        File.WriteAllText(Path.Combine(sandbox, @"Perfil 1\Cache\sub\b.dat"), new string('x', 2000));
+        File.WriteAllText(Path.Combine(sandbox, @"Perfil 2\Cache\c.tmp"), new string('x', 500));
+        File.WriteAllText(Path.Combine(sandbox, @"Perfil 2\Cache\manter.txt"), "x");
+        File.WriteAllText(Path.Combine(sandbox, @"keep\d.tmp"), "x");
+        var ro = Path.Combine(sandbox, @"Perfil 1\Cache\ro.tmp");
+        File.WriteAllText(ro, "x");
+        File.SetAttributes(ro, FileAttributes.ReadOnly);
+        var old = Path.Combine(sandbox, "velho.log");
+        var fresh = Path.Combine(sandbox, "novo.log");
+        File.WriteAllText(old, "x");
+        File.WriteAllText(fresh, "x");
+        File.SetLastWriteTime(old, DateTime.Now.AddDays(-3));
+
+        string ini =
+            "[Teste]\nCategory=Teste\nGroup=Teste\nItem=Cache\n" +
+            "FileKey1=" + sandbox + @"\*\Cache|*.*|RECURSE" + "\n" +
+            "ExcludeKey1=FILE|" + sandbox + @"\Perfil 2\Cache\|manter.txt" + "\n" +
+            "[Idade]\nCategory=Teste\nGroup=Teste\nItem=Idade\nTempAge=True\n" +
+            "FileKey1=" + sandbox + "|*.log\n" +
+            "[Pasta]\nCategory=Teste\nGroup=Teste\nItem=RemoveSelf\n" +
+            "FileKey1=" + sandbox + @"\Perfil 1|*.*|REMOVESELF" + "\n";
+        var test = RuleParser.Parse(ini, "teste");
+        Check(test.Count == 3, "parser leu 3 regras de teste");
+
+        var r1 = engine.Analyze(test[0]);
+        Check(r1.Files.Count == 4, "curinga em pasta + RECURSE + exclusão encontra 4 arquivos (achou " + r1.Files.Count + ")");
+        Check(r1.Bytes == 3501, "soma de tamanhos = 3501 bytes (" + r1.Bytes + ")");
+        engine.Clean(r1);
+        Check(r1.Removed == 4 && r1.Failed == 0, "limpeza removeu 4, incluindo somente-leitura");
+        Check(File.Exists(Path.Combine(sandbox, @"Perfil 2\Cache\manter.txt")), "arquivo excluído foi preservado");
+        Check(File.Exists(Path.Combine(sandbox, @"keep\d.tmp")), "pasta fora da regra intacta");
+
+        var r2 = engine.Analyze(test[1]);
+        Check(r2.Files.Count == 1 && r2.Files[0] == old, "TempAge: só o arquivo com mais de 24h");
+
+        var r3 = engine.Analyze(test[2]);
+        engine.Clean(r3);
+        Check(!Directory.Exists(Path.Combine(sandbox, "Perfil 1")), "REMOVESELF apagou a pasta");
+
+        var bad = RuleParser.Parse("[Perigo]\nFileKey1=%WinDir%|*.*|RECURSE\nFileKey2=%UserProfile%|*.*|RECURSE\n", "teste")[0];
+        var rb = engine.Analyze(bad);
+        Check(rb.Files.Count == 0 && rb.Note != null, "pastas protegidas são recusadas");
+        Directory.Delete(sandbox, true);
+
+        Console.WriteLine("== Utilitários ==");
+        Check(Util.ExtractExePath("\"C:\\Program Files\\X\\a.exe\" /s") == @"C:\Program Files\X\a.exe", "ExtractExePath com aspas");
+        Check(Util.ExtractExePath(@"C:\Windows\System32\cmd.exe /c echo") == @"C:\Windows\System32\cmd.exe", "ExtractExePath sem aspas e com espaços");
+        Check(Util.ExtractExePath("rundll32.exe foo.dll,Bar") == null, "ExtractExePath ignora relativo");
+        Check(Util.ExtractExePath(@"C:\Nao Existe\app.exe -x") == @"C:\Nao Existe\app.exe", "ExtractExePath de exe ausente");
+        Check(Util.FormatSize(1536) == "1.5 KB" || Util.FormatSize(1536) == "1,5 KB", "FormatSize");
+
+        Console.WriteLine("== Registro (somente leitura) ==");
+        sw.Restart();
+        var issues = new RegistryScanner().Scan(RegistryScanner.Categories);
+        Console.WriteLine("  " + issues.Count + " problemas em " + sw.ElapsedMilliseconds + " ms");
+        foreach (var g in issues.GroupBy(i => i.Category)) Console.WriteLine("    " + g.Key + ": " + g.Count());
+        foreach (var i in issues.Take(12)) Console.WriteLine("    - " + i.Problem + " | " + i.Data + " | " + i.DisplayKey + (i.ValueName != null ? " [" + i.ValueName + "]" : ""));
+
+        Console.WriteLine("== Ferramentas ==");
+        var progs = Programs.List();
+        Console.WriteLine("  programas instalados: " + progs.Count);
+        Check(progs.Count > 5, "lista de programas");
+        var st = Startup.List();
+        Console.WriteLine("  inicialização: " + st.Count + " (" + st.Count(e => e.Enabled) + " ativados)");
+        foreach (var e in st) Console.WriteLine("    " + (e.Enabled ? "[x] " : "[ ] ") + e.Name + " — " + e.Location);
+
+        Console.WriteLine("== Capturas de tela ==");
+        Application.EnableVisualStyles();
+        var form = new FreeCleaner.UI.MainForm();
+        form.StartPosition = FormStartPosition.Manual;
+        form.Location = new Point(-3000, 0);
+        form.Show();
+        foreach (var page in new[] { "home", "clean", "registry", "uninstall", "startup", "disk", "dupes", "options" })
+        {
+            form.Navigate(page);
+            var until = DateTime.Now.AddSeconds(page == "clean" || page == "uninstall" ? 8 : 1.5);
+            while (DateTime.Now < until) { Application.DoEvents(); System.Threading.Thread.Sleep(30); }
+            using (var bmp = new Bitmap(form.Width, form.Height))
+            {
+                form.DrawToBitmap(bmp, new Rectangle(0, 0, form.Width, form.Height));
+                string file = Path.Combine(outDir, "shot-" + page + ".png");
+                bmp.Save(file);
+                Console.WriteLine("  " + file);
+            }
+        }
+        form.Close();
+
+        Console.WriteLine(failures == 0 ? "\nTUDO OK" : "\n" + failures + " FALHA(S)");
+        return failures;
+    }
+}
