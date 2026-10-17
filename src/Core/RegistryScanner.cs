@@ -253,39 +253,7 @@ namespace OpenCleaner.Core
         /// <summary>Exporta (via reg.exe) todas as chaves afetadas para um único .reg.</summary>
         public static bool Backup(IEnumerable<RegIssue> issues, string target, out string error)
         {
-            error = null;
-            var keys = issues.Select(i => new { Path = Util.HiveShort(i.Hive) + "\\" + i.KeyPath, i.View })
-                             .Distinct().ToList();
-            var sb = new StringBuilder("Windows Registry Editor Version 5.00\r\n");
-            string tmp = Path.Combine(Path.GetTempPath(), "opencleaner_" + Guid.NewGuid().ToString("N") + ".reg");
-            try
-            {
-                foreach (var k in keys)
-                {
-                    if (k.Path.Contains("\"")) continue; // não monta argumentos do reg.exe com aspas vindas do registro
-                    string viewArg = k.View == RegistryView.Registry32 ? " /reg:32" : k.View == RegistryView.Registry64 ? " /reg:64" : "";
-                    var psi = new ProcessStartInfo("reg.exe", "export \"" + k.Path + "\" \"" + tmp + "\" /y" + viewArg)
-                    {
-                        CreateNoWindow = true, UseShellExecute = false
-                    };
-                    using (var proc = Process.Start(psi))
-                    {
-                        proc.WaitForExit(60000);
-                        if (proc.ExitCode != 0 || !File.Exists(tmp)) continue;
-                    }
-                    string content = File.ReadAllText(tmp, Encoding.Unicode);
-                    int nl = content.IndexOf('\n');
-                    sb.Append(nl >= 0 ? content.Substring(nl + 1) : content);
-                    File.Delete(tmp);
-                }
-                File.WriteAllText(target, sb.ToString(), Encoding.Unicode);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                error = ex.Message;
-                return false;
-            }
+            return Util.ExportRegistry(issues.Select(i => new KeyValuePair<string, RegistryView>(Util.HiveShort(i.Hive) + "\\" + i.KeyPath, i.View)), target, out error);
         }
 
         public static bool Fix(RegIssue issue)

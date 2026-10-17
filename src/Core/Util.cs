@@ -357,6 +357,62 @@ namespace OpenCleaner.Core
             catch { return null; }
         }
 
+        /// <summary>
+        /// Exporta (via reg.exe) as chaves para um único .reg. Cada chave é "HKCU\..." ou o nome completo
+        /// ("HKEY_CURRENT_USER\..."), com a visão 32/64 bits. Chaves que não existem são puladas.
+        /// </summary>
+        public static bool ExportRegistry(IEnumerable<KeyValuePair<string, RegistryView>> keys, string target, out string error)
+        {
+            error = null;
+            var sb = new System.Text.StringBuilder("Windows Registry Editor Version 5.00\r\n");
+            string tmp = Path.Combine(Path.GetTempPath(), "opencleaner_" + Guid.NewGuid().ToString("N") + ".reg");
+            try
+            {
+                foreach (var k in keys.Distinct())
+                {
+                    if (k.Key.Contains("\"")) continue; // não monta argumentos do reg.exe com aspas vindas do registro
+                    string viewArg = k.Value == RegistryView.Registry32 ? " /reg:32" : k.Value == RegistryView.Registry64 ? " /reg:64" : "";
+                    var psi = new ProcessStartInfo("reg.exe", "export \"" + k.Key + "\" \"" + tmp + "\" /y" + viewArg)
+                    {
+                        CreateNoWindow = true, UseShellExecute = false
+                    };
+                    using (var proc = Process.Start(psi))
+                    {
+                        proc.WaitForExit(60000);
+                        if (proc.ExitCode != 0 || !File.Exists(tmp)) continue;
+                    }
+                    string content = File.ReadAllText(tmp, System.Text.Encoding.Unicode);
+                    int nl = content.IndexOf('\n');
+                    sb.Append(nl >= 0 ? content.Substring(nl + 1) : content);
+                    File.Delete(tmp);
+                }
+                File.WriteAllText(target, sb.ToString(), System.Text.Encoding.Unicode);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        struct SystemPowerStatus
+        {
+            public byte ACLineStatus, BatteryFlag, BatteryLifePercent, SystemStatusFlag;
+            public int BatteryLifeTime, BatteryFullLifeTime;
+        }
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        static extern bool GetSystemPowerStatus(out SystemPowerStatus status);
+
+        /// <summary>True se o PC tem bateria (notebook, tablet); false em PC de mesa ou se não der para saber.</summary>
+        public static bool HasBattery()
+        {
+            SystemPowerStatus s;
+            return GetSystemPowerStatus(out s) && s.BatteryFlag != 128 && s.BatteryFlag != 255; // 128 = sem bateria, 255 = desconhecido
+        }
+
         // ---- Pastas que nunca devem ser varridas recursivamente ----
 
         static HashSet<string> protectedDirs;

@@ -92,6 +92,8 @@ static class RealTests
             SecurityPaths();
             RegistryReal();
             StartupReal();
+            GamesReal();
+            GpuReal();
             UninstallReal(outDir);
             DiskAnalyzerReal(fullDisk);
             DuplicatesReal();
@@ -596,6 +598,217 @@ static class RealTests
         Startup.Delete(Startup.List().First(x => x.Name == "OpenCleanerTestStartup"));
         using (var k = Registry.CurrentUser.OpenSubKey(run)) Check(k.GetValue("OpenCleanerTestStartup") == null, "excluir remove a entrada");
         using (var k = Registry.CurrentUser.OpenSubKey(approved)) Check(k == null || k.GetValue("OpenCleanerTestStartup") == null, "e o valor de aprovação");
+    }
+
+    // =====================================================================
+    // 6b. Jogos: ajustes de otimizadores (registro numa sandbox em HKCU\Software\OpenCleanerTest)
+    // =====================================================================
+
+    static void Dword(RegistryKey root, string key, string name, int value)
+    {
+        using (var k = root.CreateSubKey(key)) k.SetValue(name, value, RegistryValueKind.DWord);
+    }
+
+    static object Value(RegistryKey root, string key, string name)
+    {
+        using (var k = root.OpenSubKey(key)) return k == null ? null : k.GetValue(name);
+    }
+
+    static void GamesReal()
+    {
+        Section("Jogos: ajustes deixados por otimizadores, numa sandbox do registro");
+        const string gameBar = @"Software\Microsoft\GameBar";
+        const string dvr = @"SOFTWARE\Policies\Microsoft\Windows\GameDVR";
+        const string bg = @"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications";
+        const string schemes = @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes";
+        const string nich = "243ed252-7df6-4cfa-90ad-c9a5f636f763";
+
+        using (var hklm = Registry.CurrentUser.CreateSubKey(TestKey + @"\Games\HKLM"))
+        using (var hkcu = Registry.CurrentUser.CreateSubKey(TestKey + @"\Games\HKCU"))
+        {
+            string activated = null;
+            var ctx = new GameContext { Hklm = hklm, Hkcu = hkcu, HasBattery = true, SetActivePowerScheme = g => { activated = g; return true; } };
+            Check(GameScanner.Scan(ctx).Count == 0, "registro vazio (padrão do Windows): nada é apontado");
+
+            // Valores no padrão, ou com o tipo errado, não são apontados.
+            Dword(hkcu, gameBar, "AutoGameModeEnabled", 1);
+            using (var k = hklm.CreateSubKey(dvr)) k.SetValue("AllowGameDVR", "0", RegistryValueKind.String);
+            Dword(hkcu, bg, "GlobalUserDisabled", 0);
+            for (int i = 0; i < 12; i++)
+                if (i < 5) { Dword(hkcu, bg + @"\App" + i, "Disabled", 1); Dword(hkcu, bg + @"\App" + i, "DisabledByUser", 1); }
+                else hkcu.CreateSubKey(bg + @"\App" + i).Dispose();
+            using (var k = hklm.CreateSubKey(schemes))
+            {
+                k.SetValue("ActivePowerScheme", "11111111-2222-3333-4444-555555555555");
+                using (var s = k.CreateSubKey("11111111-2222-3333-4444-555555555555"))
+                {
+                    s.SetValue("FriendlyName", "Lenovo Balanced");
+                    s.SetValue("Description", "Plano do fabricante");
+                }
+            }
+            var none = GameScanner.Scan(ctx);
+            Check(none.Count == 0, "Modo de Jogo ligado, política com tipo errado, 5 de 12 apps desligados à mão e plano de fabricante não são apontados" +
+                                   (none.Count > 0 ? " (achou " + string.Join(", ", none.Select(f => f.Id)) + ")" : ""));
+
+            // O que o Nich FPS+ grava.
+            Dword(hkcu, gameBar, "AutoGameModeEnabled", 0);
+            Dword(hkcu, gameBar, "AllowAutoGameMode", 0);
+            Dword(hkcu, gameBar, "UseNexusForGameBarEnabled", 0);
+            Dword(hklm, dvr, "AllowGameDVR", 0);
+            Dword(hklm, dvr, "OpenCleanerTestVizinho", 7);
+            Dword(hkcu, bg, "GlobalUserDisabled", 1);
+            for (int i = 0; i < 11; i++) { Dword(hkcu, bg + @"\App" + i, "Disabled", 1); Dword(hkcu, bg + @"\App" + i, "DisabledByUser", 1); }
+            using (var k = hklm.CreateSubKey(schemes))
+            {
+                k.SetValue("ActivePowerScheme", nich);
+                using (var s = k.CreateSubKey(nich))
+                {
+                    s.SetValue("FriendlyName", "Nich FPS+");
+                    s.SetValue("Description", @"@%SystemRoot%\system32\powrprof.dll,-18,Provides ultimate performance on higher end PCs.");
+                }
+            }
+
+            var sw = Stopwatch.StartNew();
+            var found = GameScanner.Scan(ctx);
+            Perf("Verificar ajustes de jogos (sandbox)", sw);
+            var ids = found.Select(f => f.Id).ToList();
+            string[] expected = { "game-mode-off", "gamedvr-policy", "background-apps", "background-apps-bulk", "power-plan-copy" };
+            Check(expected.All(ids.Contains) && ids.Count == expected.Length, "os 5 ajustes do Nich FPS+ foram encontrados (achou " + string.Join(", ", ids) + ")");
+            var bulk = found.FirstOrDefault(f => f.Id == "background-apps-bulk");
+            Check(bulk != null && !bulk.DefaultChecked && bulk.Edits.Count == 22, "apps desligados um por um: 11 de 12, vem desmarcado e mexe só nesses 11");
+            Check(found.Where(f => f.Id == "gamedvr-policy").All(f => f.NeedsAdmin) && found.Where(f => f.Id == "game-mode-off").All(f => !f.NeedsAdmin),
+                  "política em HKLM pede administrador; Modo de Jogo (HKCU) não");
+            var plan = found.FirstOrDefault(f => f.Id == "power-plan-copy");
+            Check(plan != null && plan.Current == "Nich FPS+", "plano de energia mostrado pelo nome (" + (plan != null ? plan.Current : "-") + ")");
+            ctx.HasBattery = false;
+            Check(!GameScanner.Scan(ctx).Any(f => f.Id == "power-plan-copy"), "em PC sem bateria, a cópia do Desempenho Máximo não é apontada");
+            ctx.HasBattery = true;
+
+            string backup = Path.Combine(sandbox, "jogos.reg");
+            string error;
+            bool saved = GameScanner.Backup(found, backup, out error);
+            string text = saved && File.Exists(backup) ? File.ReadAllText(backup, Encoding.Unicode) : "";
+            Check(saved && text.Contains("AutoGameModeEnabled") && text.Contains("AllowGameDVR") && text.Contains("GlobalUserDisabled"),
+                  "backup .reg com as chaves que vão mudar" + (error != null ? " (" + error + ")" : ""));
+
+            int fixedCount = found.Count(GameScanner.Fix);
+            var after = GameScanner.Scan(ctx).Where(f => f.Id != "power-plan-copy").ToList(); // a troca de plano é simulada
+            Check(fixedCount == found.Count && after.Count == 0, "os 5 itens foram consertados e a nova verificação não acha nada");
+            Check(Equals(Value(hkcu, gameBar, "AutoGameModeEnabled"), 1) && Value(hkcu, gameBar, "AllowAutoGameMode") == null,
+                  "Modo de Jogo religado (AutoGameModeEnabled=1) e o bloqueio antigo apagado");
+            Check(Equals(Value(hkcu, gameBar, "UseNexusForGameBarEnabled"), 0) && Equals(Value(hklm, dvr, "OpenCleanerTestVizinho"), 7) &&
+                  Value(hklm, dvr, "AllowGameDVR") == null, "só os valores do conserto mudaram: os vizinhos continuam lá");
+            Check(Value(hkcu, bg + @"\App0", "Disabled") == null && Value(hkcu, bg, "GlobalUserDisabled") == null, "apps em segundo plano voltam ao padrão");
+            Check(activated == GameScanner.Balanced, "plano de energia: pede a troca para o Equilibrado");
+
+            var p = Process.Start(new ProcessStartInfo("reg.exe", "import \"" + backup + "\"") { CreateNoWindow = true, UseShellExecute = false, RedirectStandardError = true });
+            p.WaitForExit();
+            var restored = GameScanner.Scan(ctx).Select(f => f.Id).ToList();
+            Check(p.ExitCode == 0 && expected.All(restored.Contains), "reg import do backup trouxe os ajustes de volta");
+        }
+
+        var real = Stopwatch.StartNew();
+        var onThisPc = GameScanner.Scan(GameContext.System());
+        Perf("Verificar ajustes de jogos (registro real, só leitura)", real, onThisPc.Count + " itens: " + string.Join(", ", onThisPc.Select(f => f.Id)));
+        Check(real.ElapsedMilliseconds < 1000, "verificação no registro real em menos de 1 s");
+    }
+
+    // =====================================================================
+    // 6c. Jogos: GPU por jogo (descoberta numa sandbox de pastas e de registro)
+    // =====================================================================
+
+    static void GpuReal()
+    {
+        Section("Jogos: GPU por jogo em notebooks com duas placas");
+        Check(GpuPreference.Merge(null, 2) == "GpuPreference=2;", "valor novo: GpuPreference=2;");
+        Check(GpuPreference.Merge("GpuPreference=1;", 2) == "GpuPreference=2;", "economia de energia vira alto desempenho");
+        Check(GpuPreference.Merge("SwapEffectUpgradeEnable=1;", 2) == "GpuPreference=2;SwapEffectUpgradeEnable=1;", "outros itens do valor são preservados");
+        Check(GpuPreference.Merge("GpuPreference=2;SwapEffectUpgradeEnable=1;", 0) == "SwapEffectUpgradeEnable=1;", "\"Windows decide\" tira só o GpuPreference");
+        Check(GpuPreference.Merge("GpuPreference=2;", 0) == null, "\"Windows decide\" sem outros itens apaga o valor");
+
+        var intel = new VideoAdapter { Name = "Intel(R) HD Graphics Family", PnpId = @"PCI\VEN_8086&DEV_0A16&SUBSYS_13FD1043" };
+        var nvidia = new VideoAdapter { Name = "NVIDIA GeForce 820M", PnpId = @"PCI\VEN_10DE&DEV_1140&SUBSYS_227A1043" };
+        var arc = new VideoAdapter { Name = "Intel(R) Arc(TM) A370M Graphics", PnpId = @"PCI\VEN_8086&DEV_5693" };
+        var basic = new VideoAdapter { Name = "Microsoft Basic Display Adapter", PnpId = @"PCI\VEN_10DE&DEV_2520" };
+        var virt = new VideoAdapter { Name = "Parsec Virtual Display Adapter", PnpId = @"ROOT\DISPLAY\0000" };
+        Check(GpuPreference.IsHybridLaptop(new[] { intel, nvidia }, true), "Intel + NVIDIA com bateria: híbrido");
+        Check(!GpuPreference.IsHybridLaptop(new[] { intel, nvidia }, false), "Intel + NVIDIA sem bateria (PC de mesa): não");
+        Check(!GpuPreference.IsHybridLaptop(new[] { nvidia }, true), "uma placa só: não");
+        Check(GpuPreference.IsHybridLaptop(new[] { intel, arc }, true), "Intel integrada + Intel Arc: híbrido");
+        Check(!GpuPreference.IsHybridLaptop(new[] { intel, basic, virt }, true), "driver genérico da Microsoft e placa virtual não contam");
+
+        // Pastas: uma Steam com duas bibliotecas, um manifesto da Epic e o registro de jogos do Windows.
+        string root = Path.Combine(sandbox, "jogos");
+        string steam = Path.Combine(root, "Steam"), lib2 = Path.Combine(root, "Biblioteca 2");
+        File.WriteAllText(Path.Combine(Directory.CreateDirectory(Path.Combine(steam, "steamapps")).FullName, "libraryfolders.vdf"),
+            "\"libraryfolders\"\n{\n\t\"0\"\n\t{\n\t\t\"path\"\t\t\"" + steam.Replace(@"\", @"\\") + "\"\n\t}\n\t\"1\"\n\t{\n\t\t\"path\"\t\t\"" + lib2.Replace(@"\", @"\\") + "\"\n\t}\n}\n");
+        Func<string, string, string, string> acf = (id, name, dir) => "\"AppState\"\n{\n\t\"appid\"\t\t\"" + id + "\"\n\t\"name\"\t\t\"" + name + "\"\n\t\"installdir\"\t\t\"" + dir + "\"\n}\n";
+        File.WriteAllText(Path.Combine(steam, @"steamapps\appmanifest_100.acf"), acf("100", "Jogo Steam A", "Jogo A"));
+        File.WriteAllText(Path.Combine(steam, @"steamapps\appmanifest_228980.acf"), acf("228980", "Steamworks Common Redistributables", "Steamworks Shared"));
+        Directory.CreateDirectory(Path.Combine(lib2, "steamapps"));
+        File.WriteAllText(Path.Combine(lib2, @"steamapps\appmanifest_200.acf"), acf("200", "Jogo Steam B", "Jogo B"));
+        string a = Path.Combine(steam, @"steamapps\common\Jogo A");
+        string exeA = Path.Combine(a, "JogoA.exe");
+        foreach (var f in new[] { exeA, Path.Combine(a, "unins000.exe"), Path.Combine(a, "UnityCrashHandler64.exe"), Path.Combine(a, @"_CommonRedist\instalar.exe"),
+                                  Path.Combine(steam, @"steamapps\common\Steamworks Shared\redist.exe") })
+            Write(f);
+        string b = Path.Combine(lib2, @"steamapps\common\Jogo B");
+        string exeB = Path.Combine(b, @"Binaries\Win64\JogoB-Win64-Shipping.exe");
+        Write(exeB);
+        Write(Path.Combine(b, "JogoB.exe"));
+
+        string epicDir = Path.Combine(root, @"Epic Games\Jogo Epic");
+        string exeEpic = Path.Combine(epicDir, @"Bin\JogoEpic.exe");
+        Write(exeEpic);
+        string manifests = Directory.CreateDirectory(Path.Combine(root, "Manifests")).FullName;
+        File.WriteAllText(Path.Combine(manifests, "1.item"), "{\n\t\"DisplayName\": \"Jogo Epic\",\n\t\"InstallLocation\": \"" + epicDir.Replace(@"\", @"\\") + "\",\n\t\"LaunchExecutable\": \"Bin/JogoEpic.exe\"\n}");
+        File.WriteAllText(Path.Combine(manifests, "2.item"), "{\"DisplayName\": \"Malicioso\", \"InstallLocation\": \"" + epicDir.Replace(@"\", @"\\") + "\", \"LaunchExecutable\": \"..\\\\..\\\\..\\\\notepad.exe\"}");
+
+        string exeValorant = Path.Combine(root, @"Riot Games\VALORANT\live\ShooterGame\Binaries\Win64\VALORANT-Win64-Shipping.exe");
+        string exeRiot = Path.Combine(root, @"Riot Games\Riot Client\RiotClientServices.exe");
+        Write(exeValorant);
+        Write(exeRiot);
+
+        using (var hkcu = Registry.CurrentUser.CreateSubKey(TestKey + @"\Gpu\HKCU"))
+        {
+            string[] seen = { exeValorant, exeB, exeRiot, Path.Combine(root, "nao-existe.exe") };
+            for (int i = 0; i < seen.Length; i++)
+                using (var k = hkcu.CreateSubKey(@"System\GameConfigStore\Children\c" + i)) k.SetValue("MatchedExeFullPath", seen[i]);
+
+            var sources = new GameSources { Hkcu = hkcu, EpicManifests = manifests };
+            sources.SteamRoots.Add(steam);
+            var sw = Stopwatch.StartNew();
+            var games = GameLibrary.Find(sources);
+            Perf("Encontrar jogos (sandbox)", sw, games.Count + " jogos");
+            Func<string, InstalledGame> game = n => games.FirstOrDefault(g => g.Name == n);
+            Check(games.Count == 4 && game("Jogo Steam A") != null && game("Jogo Steam B") != null && game("Jogo Epic") != null && game("VALORANT-Win64-Shipping") != null,
+                  "4 jogos: Steam (2 bibliotecas), Epic e um visto só pelo Windows (achou " + string.Join(", ", games.Select(g => g.Name + " [" + g.Store + "]")) + ")");
+            var gA = game("Jogo Steam A");
+            Check(gA != null && gA.Exes.Count == 1 && gA.Exes[0] == exeA, "Steam sem registro do Windows: palpite ignora desinstalador, crash handler e _CommonRedist");
+            var gB = game("Jogo Steam B");
+            Check(gB != null && gB.Exes.Count == 1 && gB.Exes[0] == exeB, "Steam com registro do Windows: usa o executável que rodou, não o palpite");
+            var gE = game("Jogo Epic");
+            Check(gE != null && gE.Exes.Count == 1 && gE.Exes[0] == exeEpic, "Epic: LaunchExecutable do manifesto; manifesto com \"..\" é recusado");
+            Check(!games.SelectMany(g => g.Exes).Any(e => e.EndsWith("RiotClientServices.exe") || e.Contains("Steamworks Shared") || e.Contains("nao-existe")),
+                  "launchers, redistribuíveis da Steam e executáveis apagados ficam de fora");
+
+            Check(GpuPreference.Get(hkcu, exeA) == GpuPreference.WindowsDecides, "sem valor: Windows decide");
+            Check(GpuPreference.Set(hkcu, exeA, GpuPreference.HighPerformance) && GpuPreference.Get(hkcu, exeA) == GpuPreference.HighPerformance, "gravar alto desempenho");
+            using (var k = hkcu.CreateSubKey(GpuPreference.Key)) k.SetValue(exeB, "GpuPreference=1;SwapEffectUpgradeEnable=1;");
+            Check(GpuPreference.Get(hkcu, exeB) == GpuPreference.PowerSaving, "lê economia de energia num valor com outros itens");
+            GpuPreference.Set(hkcu, exeB, GpuPreference.HighPerformance);
+            Check(Equals(Value(hkcu, GpuPreference.Key, exeB), "GpuPreference=2;SwapEffectUpgradeEnable=1;"), "trocar a GPU preserva o SwapEffectUpgradeEnable");
+            GpuPreference.Set(hkcu, exeA, GpuPreference.WindowsDecides);
+            Check(Value(hkcu, GpuPreference.Key, exeA) == null, "voltar para \"Windows decide\" apaga o valor");
+        }
+
+        var real = Stopwatch.StartNew();
+        var mine = GameLibrary.Find(GameSources.System());
+        var adapters = GpuPreference.Adapters();
+        bool hybrid = GpuPreference.IsHybridLaptop(adapters, Util.HasBattery());
+        Perf("Encontrar jogos e placas (PC real, só leitura)", real, mine.Count + " jogos (" + string.Join(", ", mine.Select(g => g.Name)) + "); " +
+             string.Join(" + ", adapters.Select(x => x.Name)) + (hybrid ? "; híbrido" : ""));
+        Check(real.ElapsedMilliseconds < 5000, "descoberta de jogos e placas no PC real em menos de 5 s");
     }
 
     // =====================================================================
