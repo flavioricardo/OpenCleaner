@@ -22,8 +22,10 @@ namespace OpenCleaner.Core
         public string Id, Name, Why, Location, Current, Expected;
         public bool NeedsAdmin, DefaultChecked = true;
         public readonly List<RegEdit> Edits = new List<RegEdit>();
-        /// <summary>Ação fora do registro (só a troca do plano de energia).</summary>
+        /// <summary>Ação fora do registro: trocar o plano de energia ou abrir uma página da Microsoft Store.</summary>
         public Func<bool> Run;
+        /// <summary>O que dizer depois de aplicar, quando falta um passo do usuário (instalar pela Store).</summary>
+        public string AfterApply;
     }
 
     /// <summary>De onde o scanner lê e onde o conserto escreve. Os testes trocam as raízes por uma sandbox.</summary>
@@ -32,6 +34,8 @@ namespace OpenCleaner.Core
         public RegistryKey Hklm, Hkcu;
         public bool HasBattery;
         public Func<string, bool> SetActivePowerScheme;
+        /// <summary>Abre um endereço ms-windows-store:// do catálogo.</summary>
+        public Func<string, bool> OpenStore;
 
         public static GameContext System()
         {
@@ -40,7 +44,13 @@ namespace OpenCleaner.Core
                 Hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, Environment.Is64BitOperatingSystem ? RegistryView.Registry64 : RegistryView.Default),
                 Hkcu = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, RegistryView.Default),
                 HasBattery = Util.HasBattery(),
-                SetActivePowerScheme = PowerCfgSetActive
+                SetActivePowerScheme = PowerCfgSetActive,
+                OpenStore = uri =>
+                {
+                    if (!uri.StartsWith("ms-windows-store://pdp/?ProductId=", StringComparison.Ordinal)) return false;
+                    try { Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true }); return true; }
+                    catch { return false; }
+                }
             };
         }
 
@@ -77,6 +87,16 @@ namespace OpenCleaner.Core
         const string BackgroundApps = @"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications";
         const string AppPrivacyPolicy = @"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy";
         const string PowerSchemes = @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes";
+        /// <summary>Pacotes da Store registrados para o usuário: uma subchave por pacote (Nome_Versão_Arq__Editor).</summary>
+        const string Packages = @"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages";
+
+        /// <summary>Apps de sistema que fazem o login na conta Xbox dos jogos, com o ID de cada um na Microsoft Store.</summary>
+        static readonly string[,] XboxApps =
+        {
+            { "Microsoft.XboxIdentityProvider", "Xbox Identity Provider", "9WZDNCRD1HKW" },
+            { "Microsoft.Xbox.TCUI", "Xbox TCUI", "9NKNC0LD5NN6" },
+            { "Microsoft.GamingServices", "Gaming Services", "9MWPM2CQNLHN" }
+        };
 
         /// <summary>Planos que vêm com o Windows (inclusive as sobreposições do modo de energia).</summary>
         static readonly HashSet<string> BuiltInSchemes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -89,7 +109,7 @@ namespace OpenCleaner.Core
         public static List<GameFinding> Scan(GameContext c)
         {
             var found = new List<GameFinding>();
-            foreach (var check in new Action<GameContext, List<GameFinding>>[] { GameMode, GameDvr, Background, PowerPlan })
+            foreach (var check in new Action<GameContext, List<GameFinding>>[] { GameMode, GameDvr, XboxSignIn, Background, PowerPlan })
             {
                 try { check(c, found); }
                 catch { }
@@ -157,6 +177,51 @@ namespace OpenCleaner.Core
             };
             f.Edits.Add(new RegEdit { Root = c.Hklm, Key = GameDvrPolicy, Name = "AllowGameDVR" });
             found.Add(f);
+        }
+
+        static void XboxSignIn(GameContext c, List<GameFinding> found)
+        {
+            var installed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using (var k = c.Hkcu.OpenSubKey(Packages))
+            {
+                if (k == null) return; // sem a lista não dá para afirmar que falta algo
+                foreach (var full in k.GetSubKeyNames())
+                {
+                    int i = full.IndexOf('_');
+                    installed.Add(i < 0 ? full : full.Substring(0, i));
+                }
+            }
+            // Sem a Microsoft Store (Windows LTSC, imagens corporativas), esses apps nunca vieram e não há como instalar.
+            if (!installed.Contains("Microsoft.WindowsStore")) return;
+
+            var missing = new List<int>();
+            for (int i = 0; i < XboxApps.GetLength(0); i++)
+            {
+                if (installed.Contains(XboxApps[i, 0])) continue;
+                // Gaming Services só vem com o app Xbox; sem ele, a falta não quer dizer nada.
+                if (XboxApps[i, 0] == "Microsoft.GamingServices" && !installed.Contains("Microsoft.GamingApp")) continue;
+                missing.Add(i);
+            }
+            if (missing.Count == 0) return;
+
+            string names = string.Join(", ", missing.Select(i => XboxApps[i, 1]));
+            string first = XboxApps[missing[0], 1];
+            string uri = "ms-windows-store://pdp/?ProductId=" + XboxApps[missing[0], 2];
+            found.Add(new GameFinding
+            {
+                Id = "xbox-sign-in",
+                Name = missing.Count == 1 ? L.F("Falta o {0}, usado no login dos jogos", "{0} is missing; games use it to sign in", first)
+                                          : L.T("Faltam apps do Xbox usados no login dos jogos", "Xbox apps that games use to sign in are missing"),
+                Why = L.T("Jogos da Microsoft Store e do PC Game Pass (Minecraft, Forza, Halo, Sea of Thieves) usam esses apps do sistema para entrar na conta Xbox. Sem eles, o jogo não faz login ou nem abre. Otimizadores removem esses apps junto com o resto do Xbox. O OpenCleaner não instala nada sozinho: aplicar abre a página do ",
+                          "Microsoft Store and PC Game Pass games (Minecraft, Forza, Halo, Sea of Thieves) use these system apps to sign in to Xbox. Without them, the game cannot sign in or does not start at all. Optimizers remove them along with the rest of Xbox. OpenCleaner installs nothing by itself: applying opens the Microsoft Store page for ") +
+                      first + L.T(" na Microsoft Store, onde você clica em Obter.", ", where you click Get."),
+                Location = names,
+                Current = missing.Count == 1 ? L.T("não instalado", "not installed") : L.F("{0} não instalados", "{0} not installed", missing.Count),
+                Expected = L.T("instalados", "installed"),
+                Run = () => c.OpenStore(uri),
+                AfterApply = L.F("A Microsoft Store abriu na página do {0}: clique em Obter e depois em Verificar de novo.",
+                                 "The Microsoft Store opened on the {0} page: click Get, then Check again.", first)
+            });
         }
 
         static void Background(GameContext c, List<GameFinding> found)

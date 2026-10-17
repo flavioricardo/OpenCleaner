@@ -196,8 +196,12 @@ namespace OpenCleaner.UI
             var findings = items.Select(i => i.Tag).OfType<GameFinding>().ToList();
             var games = items.Select(i => i.Tag).OfType<InstalledGame>().ToList();
 
-            var backup = MessageBox.Show(this, L.T("Salvar um backup (.reg) do que vai mudar?\nCom ele dá para desfazer depois.", "Save a backup (.reg) of what will change?\nIt lets you undo it later."),
-                                         L.T("Backup", "Backup"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+            var keys = GameScanner.BackupKeys(findings).ToList();
+            if (games.Count > 0) keys.Add(new KeyValuePair<string, RegistryView>(@"HKCU\" + GpuPreference.Key, RegistryView.Default));
+            // Abrir a Store ou trocar o plano de energia não mexe no registro: aí não há o que salvar.
+            var backup = keys.Count == 0 ? DialogResult.No
+                : MessageBox.Show(this, L.T("Salvar um backup (.reg) do que vai mudar?\nCom ele dá para desfazer depois.", "Save a backup (.reg) of what will change?\nIt lets you undo it later."),
+                                  L.T("Backup", "Backup"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
             if (backup == DialogResult.Cancel) return;
             if (backup == DialogResult.Yes)
             {
@@ -210,8 +214,6 @@ namespace OpenCleaner.UI
                 })
                 {
                     if (d.ShowDialog(this) != DialogResult.OK) return;
-                    var keys = GameScanner.BackupKeys(findings).ToList();
-                    if (games.Count > 0) keys.Add(new KeyValuePair<string, RegistryView>(@"HKCU\" + GpuPreference.Key, RegistryView.Default));
                     Cursor = Cursors.WaitCursor;
                     string error;
                     bool ok = Util.ExportRegistry(keys, d.FileName, out error);
@@ -233,7 +235,9 @@ namespace OpenCleaner.UI
                 if (ok) done++; else failed++;
             }
             Cursor = Cursors.Default;
-            string msg = done + L.T(" itens aplicados", " items applied") + (failed > 0 ? " · " + failed + L.T(" não puderam ser alterados", " could not be changed") : ".") +
+            // O passo que falta ao usuário (instalar pela Store) vem primeiro: a linha de status corta o fim.
+            string msg = string.Concat(findings.Where(f => f.AfterApply != null).Select(f => f.AfterApply + " ")) +
+                         done + L.T(" itens aplicados", " items applied") + (failed > 0 ? " · " + failed + L.T(" não puderam ser alterados", " could not be changed") : ".") +
                          (games.Count > 0 ? L.T(" Os jogos usam a placa nova na próxima vez que abrirem.", " Games use the new card the next time they start.") : "");
             Scan(() => SetStatus(msg, failed > 0 ? StatusKind.Danger : StatusKind.Good));
         }

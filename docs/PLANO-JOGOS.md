@@ -1,6 +1,6 @@
 # Plano: menu Jogos
 
-Status: etapas 1 a 3 implementadas. O núcleo está em `src/Core/Games.cs`, `GameLibrary.cs` e
+Status: etapas 1 a 4 implementadas. O núcleo está em `src/Core/Games.cs`, `GameLibrary.cs` e
 `GpuPreference.cs`; a interface, em `src/UI/GamesPage.cs`, no item "Jogos" da barra lateral e num 4º
 cartão na Verificação de saúde. Testes: `tests/RealTests.cs` e capturas em `tests/SmokeTest.cs`. Os quatro
 cartões ficam sempre numa linha: duas linhas não cabem na altura mínima da janela.
@@ -76,7 +76,7 @@ que já existe.
 |---|---|---|---|
 | `game-mode-off` | `HKCU\Software\Microsoft\GameBar` `AutoGameModeEnabled=0` ou `AllowAutoGameMode=0` | Apaga os valores (padrão: ligado) | sim |
 | `gamedvr-policy` | `HKLM\SOFTWARE\Policies\Microsoft\Windows\GameDVR` `AllowGameDVR=0` | Apaga o valor | sim |
-| `xbox-sign-in` | Faltam `Microsoft.XboxIdentityProvider` ou `Microsoft.Xbox.TCUI`, que vêm com o Windows; ou falta `Microsoft.GamingServices` com o app Xbox (`Microsoft.GamingApp`) instalado (lido em `HKCU\Software\Classes\Local Settings\...\AppModel\Repository\Packages`, sem PowerShell) | **Não reinstala sozinho**: abre a página do app na Microsoft Store (IDs a confirmar) | sim, os dois primeiros |
+| `xbox-sign-in` | Faltam `Microsoft.XboxIdentityProvider` ou `Microsoft.Xbox.TCUI`, que vêm com o Windows; ou falta `Microsoft.GamingServices` com o app Xbox (`Microsoft.GamingApp`) instalado (lido em `HKCU\Software\Classes\Local Settings\...\AppModel\Repository\Packages`, sem PowerShell) | **Não reinstala sozinho**: abre na Microsoft Store a página do primeiro que falta: Identity Provider `9WZDNCRD1HKW`, TCUI `9NKNC0LD5NN6`, Gaming Services `9MWPM2CQNLHN` (confirmados em 17/10/2026). Só aponta se a Microsoft Store estiver instalada (no LTSC esses apps nunca vêm). Não mexe no registro, então não entra no backup | sim, os dois primeiros |
 | `power-plan-copy` | Plano ativo fora dos GUIDs do Windows e com a descrição do *Desempenho Máximo* (`@%SystemRoot%\system32\powrprof.dll,-18`, visto no `.pow` do Nich FPS+), **em PC com bateria** | `powercfg /setactive` no Equilibrado. O plano copiado continua na lista | sim |
 | `background-apps` | `GlobalUserDisabled=1` (HKCU) ou a política `LetAppsRunInBackground=2` | Apaga os valores. Se **todos** os apps tiverem `Disabled=1`, o padrão típico de booster, oferece limpar esses valores também | sim |
 | `browser-updates` | Serviços de atualização do Chrome (`gupdate`, `gupdatem`, `GoogleUpdaterService*`, `GoogleUpdaterInternalService*`, `GoogleChromeElevationService`) ou do Edge desativados | Padrão de cada serviço (`gupdate`/`edgeupdate`: Automático atrasado; os demais: Manual) | a conferir |
@@ -298,7 +298,6 @@ As etapas 1 e 2 não dependem uma da outra e podem ser feitas em paralelo. A 3 j
 
 ## Decisões em aberto
 
-- Confirmar os IDs da Store para Xbox Identity Provider, Xbox TCUI e Gaming Services.
 - Confirmar qual preferência de GPU vale quando o painel da NVIDIA e a do Windows divergem, antes de
   escrever o texto da interface.
 - Jogos sem `.exe` principal conhecido (Steam, sem passagem pelo registro de jogos): aplicar a todos os

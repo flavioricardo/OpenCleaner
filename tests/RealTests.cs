@@ -614,6 +614,8 @@ static class RealTests
         using (var k = root.OpenSubKey(key)) return k == null ? null : k.GetValue(name);
     }
 
+    static string lastStore;
+
     static void GamesReal()
     {
         Section("Jogos: ajustes deixados por otimizadores, numa sandbox do registro");
@@ -706,6 +708,40 @@ static class RealTests
             var restored = GameScanner.Scan(ctx).Select(f => f.Id).ToList();
             Check(p.ExitCode == 0 && expected.All(restored.Contains), "reg import do backup trouxe os ajustes de volta");
         }
+
+        // Login do Xbox: lista de pacotes do usuário numa sandbox; abrir a Store é simulado.
+        const string packages = @"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages";
+        Func<string[], string, List<GameFinding>> xbox = (pkgs, tag) =>
+        {
+            string root = TestKey + @"\Xbox" + tag;
+            using (var hkcu = Registry.CurrentUser.CreateSubKey(root))
+            using (var hklm = Registry.CurrentUser.CreateSubKey(root + "HKLM"))
+            {
+                if (pkgs != null)
+                    foreach (var p in pkgs) hkcu.CreateSubKey(packages + "\\" + p).Dispose();
+                var ctx = new GameContext { Hklm = hklm, Hkcu = hkcu, OpenStore = u => { lastStore = u; return true; } };
+                return GameScanner.Scan(ctx).Where(f => f.Id == "xbox-sign-in").ToList();
+            }
+        };
+        const string store = "Microsoft.WindowsStore_22409.1401.5.0_x64__8wekyb3d8bbwe";
+        const string identity = "Microsoft.XboxIdentityProvider_12.95.3001.0_x64__8wekyb3d8bbwe";
+        const string tcui = "Microsoft.Xbox.TCUI_1.24.10001.0_x64__8wekyb3d8bbwe";
+        const string xboxApp = "Microsoft.GamingApp_2509.1001.29.0_x64__8wekyb3d8bbwe";
+        const string services = "Microsoft.GamingServices_31.106.13001.0_x64__8wekyb3d8bbwe";
+        Check(xbox(null, "A").Count == 0, "sem a lista de pacotes: não afirma que falta nada");
+        Check(xbox(new[] { "Microsoft.WindowsCalculator_11.0.0.0_x64__8wekyb3d8bbwe" }, "B").Count == 0, "sem a Microsoft Store (LTSC): não aponta apps do Xbox");
+        Check(xbox(new[] { store, identity, tcui }, "C").Count == 0, "Identity Provider e TCUI presentes, sem o app Xbox: nada falta");
+        lastStore = null;
+        var all = xbox(new[] { store, xboxApp }, "D");
+        Check(all.Count == 1 && all[0].Location.Contains("Xbox Identity Provider") && all[0].Location.Contains("Xbox TCUI") && all[0].Location.Contains("Gaming Services"),
+              "app Xbox sem os três apps de sistema: os três aparecem num item só");
+        Check(all.Count == 1 && GameScanner.Fix(all[0]) && lastStore == "ms-windows-store://pdp/?ProductId=9WZDNCRD1HKW" && all[0].AfterApply != null,
+              "aplicar abre a Store no Xbox Identity Provider (o primeiro que falta) e explica o passo seguinte");
+        var onlyServices = xbox(new[] { store, identity, tcui, xboxApp }, "E");
+        Check(onlyServices.Count == 1 && GameScanner.Fix(onlyServices[0]) && lastStore == "ms-windows-store://pdp/?ProductId=9MWPM2CQNLHN",
+              "app Xbox sem Gaming Services: abre a Store no Gaming Services");
+        Check(xbox(new[] { store, identity, tcui, xboxApp, services }, "F").Count == 0, "tudo instalado: nada é apontado");
+        Check(all.Count == 1 && all[0].Edits.Count == 0 && !all[0].NeedsAdmin, "o item não mexe no registro nem pede administrador");
 
         var real = Stopwatch.StartNew();
         var onThisPc = GameScanner.Scan(GameContext.System());
