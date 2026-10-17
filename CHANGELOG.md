@@ -3,7 +3,7 @@
 Todas as mudanças relevantes do OpenCleaner. O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/)
 e as versões seguem o [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
-## [Não lançado]
+## [1.0.1] - 2026-10-17
 
 ### Segurança
 
@@ -47,4 +47,5 @@ Primeira versão pública.
 - App, instalador e desinstalador em português e inglês, com o idioma do Windows por padrão, seletor no instalador
   e em *Opções*; as seleções de limpeza salvas valem nos dois idiomas.
 
+[1.0.1]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.0.1
 [1.0.0]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.0.0

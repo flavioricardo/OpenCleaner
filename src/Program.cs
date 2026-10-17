@@ -10,8 +10,8 @@ using OpenCleaner.Core;
 [assembly: AssemblyDescription("Limpador de sistema gratuito e de código aberto")]
 [assembly: AssemblyProduct("OpenCleaner")]
 [assembly: AssemblyCopyright("OpenCleaner")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.0.1.0")]
+[assembly: AssemblyFileVersion("1.0.1.0")]
 // P/Invoke só procura DLLs do sistema no System32 (não na pasta do executável).
 [assembly: System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
 
