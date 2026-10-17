@@ -40,27 +40,28 @@ namespace OpenCleaner
             try
             {
                 var settings = AppSettings.Load();
+                L.Init(settings.Language);
                 var engine = new CleanerEngine(settings);
                 long freed = 0;
                 foreach (var rule in RuleCatalog.LoadAll(settings).Where(r => settings.IsRuleOn(r) && r.IsDetected()))
                 {
                     if (rule.Processes.Count > 0 && Util.FindProcesses(rule.Processes).Count > 0)
                     {
-                        log.AppendLine("Pulado (programa aberto): " + rule.FullName);
+                        log.AppendLine(L.T("Pulado (programa aberto): ", "Skipped (program open): ") + rule.FullName);
                         continue;
                     }
                     var r = engine.Analyze(rule);
                     if (r.ItemCount == 0) continue;
                     engine.Clean(r);
                     freed += r.Freed;
-                    log.AppendLine(rule.FullName + ": " + Util.FormatSize(r.Freed) + (r.Failed > 0 ? " (" + r.Failed + " em uso)" : ""));
+                    log.AppendLine(rule.FullName + ": " + Util.FormatSize(r.Freed) + (r.Failed > 0 ? " (" + r.Failed + L.T(" em uso)", " in use)") : ""));
                 }
-                log.AppendLine("Total liberado: " + Util.FormatSize(freed));
+                log.AppendLine(L.T("Total liberado: ", "Total freed: ") + Util.FormatSize(freed));
                 return 0;
             }
             catch (Exception ex)
             {
-                log.AppendLine("Erro: " + ex);
+                log.AppendLine(L.T("Erro: ", "Error: ") + ex);
                 return 1;
             }
             finally

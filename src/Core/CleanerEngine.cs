@@ -60,7 +60,7 @@ namespace OpenCleaner.Core
                 {
                     if ((fk.Recurse || matchAll) && Util.IsProtectedDir(dir))
                     {
-                        r.Note = "Pasta protegida ignorada: " + dir;
+                        r.Note = L.T("Pasta protegida ignorada: ", "Protected folder skipped: ") + dir;
                         continue;
                     }
                     if (IsExcluded(dir, null, excludes)) continue;

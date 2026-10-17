@@ -11,31 +11,39 @@ namespace OpenCleaner.UI
 {
     class RegistryPage : Page
     {
+        /// <summary>Mostra o nome traduzido; a chave (em português) é o que vai para as configurações.</summary>
+        class CategoryItem
+        {
+            public readonly string Key;
+            public CategoryItem(string key) { Key = key; }
+            public override string ToString() { return RegistryScanner.Label(Key); }
+        }
+
         readonly CheckedListBox cats;
         readonly ListCard results;
         readonly Button btnScan, btnFix;
         bool busy;
 
         public RegistryPage(MainForm main)
-            : base(main, "Registro", "Encontra entradas do registro que apontam para arquivos e programas que não existem mais.")
+            : base(main, L.T("Registro", "Registry"), L.T("Encontra entradas do registro que apontam para arquivos e programas que não existem mais.", "Finds registry entries that point to files and programs that no longer exist."))
         {
-            btnFix = AddAction("Corrigir marcados", ButtonKind.Primary, "wrench", Fix);
-            btnScan = AddAction("Procurar problemas", ButtonKind.Secondary, "search", Scan);
-            SetStatus("Nada foi verificado ainda.");
+            btnFix = AddAction(L.T("Corrigir marcados", "Fix checked"), ButtonKind.Primary, "wrench", Fix);
+            btnScan = AddAction(L.T("Procurar problemas", "Scan for issues"), ButtonKind.Secondary, "search", Scan);
+            SetStatus(L.T("Nada foi verificado ainda.", "Nothing has been scanned yet."));
 
             var right = new Panel { Dock = DockStyle.Fill, Padding = Theme.Pad(16, 0, 0, 0) };
             var list = Theme.MakeList(true);
-            Theme.Col(list, "Problema", 240);
-            Theme.Col(list, "Arquivo ou pasta", 220);
-            Theme.Col(list, "Chave do registro", 300);
+            Theme.Col(list, L.T("Problema", "Issue"), 240);
+            Theme.Col(list, L.T("Arquivo ou pasta", "File or folder"), 220);
+            Theme.Col(list, L.T("Chave do registro", "Registry key"), 300);
             Theme.EnableSorting(list);
             var menu = new ContextMenuStrip { Font = Theme.Base };
-            menu.Items.Add("Marcar todos", null, (s, e) => CheckAll(true));
-            menu.Items.Add("Desmarcar todos", null, (s, e) => CheckAll(false));
-            menu.Items.Add("Abrir no Editor do Registro", null, (s, e) => OpenInRegedit());
+            menu.Items.Add(L.T("Marcar todos", "Check all"), null, (s, e) => CheckAll(true));
+            menu.Items.Add(L.T("Desmarcar todos", "Uncheck all"), null, (s, e) => CheckAll(false));
+            menu.Items.Add(L.T("Abrir no Editor do Registro", "Open in Registry Editor"), null, (s, e) => OpenInRegedit());
             list.ContextMenuStrip = menu;
             results = new ListCard(list) { Dock = DockStyle.Fill };
-            results.SetEmpty("Clique em Procurar problemas.\nNada é alterado até você clicar em Corrigir marcados, e dá para salvar um backup antes.", "database");
+            results.SetEmpty(L.T("Clique em Procurar problemas.\nNada é alterado até você clicar em Corrigir marcados, e dá para salvar um backup antes.", "Click Scan for issues.\nNothing changes until you click Fix checked, and you can save a backup first."), "database");
             right.Controls.Add(results);
             Body.Controls.Add(right);
             BindToSelection(btnFix, list, true, () => !busy);
@@ -51,16 +59,16 @@ namespace OpenCleaner.UI
             };
             cats.ItemHeight = Theme.S(24);
             foreach (var c in RegistryScanner.Categories)
-                cats.Items.Add(c, !Main.Settings.RegistryDisabled.Contains(c));
+                cats.Items.Add(new CategoryItem(c), !Main.Settings.RegistryDisabled.Contains(c));
             cats.ItemCheck += (s, e) =>
             {
-                string c = (string)cats.Items[e.Index];
+                string c = ((CategoryItem)cats.Items[e.Index]).Key;
                 Main.Settings.RegistryDisabled.Remove(c);
                 if (e.NewValue == CheckState.Unchecked) Main.Settings.RegistryDisabled.Add(c);
                 Main.Settings.Save();
             };
             left.Controls.Add(cats);
-            var heading = Theme.SectionLabel("Verificar");
+            var heading = Theme.SectionLabel(L.T("Verificar", "Scan"));
             heading.Dock = DockStyle.Top;
             heading.Padding = Theme.Pad(0, 0, 0, 8);
             left.Controls.Add(heading);
@@ -76,8 +84,8 @@ namespace OpenCleaner.UI
 
         void Scan()
         {
-            var selected = cats.CheckedItems.Cast<string>().ToList();
-            if (selected.Count == 0) { SetStatus("Marque ao menos uma categoria à esquerda.", StatusKind.Warning); return; }
+            var selected = cats.CheckedItems.Cast<CategoryItem>().Select(i => i.Key).ToList();
+            if (selected.Count == 0) { SetStatus(L.T("Marque ao menos uma categoria à esquerda.", "Check at least one category on the left."), StatusKind.Warning); return; }
             busy = true;
             btnScan.Enabled = false;
             Reevaluate(btnFix);
@@ -87,7 +95,7 @@ namespace OpenCleaner.UI
             results.SetEmpty(null);
             Progress.StartIndeterminate();
             var scanner = new RegistryScanner();
-            scanner.Progress = c => Ui(() => SetStatus("Verificando " + c.ToLowerInvariant() + "..."));
+            scanner.Progress = c => Ui(() => SetStatus(L.T("Verificando ", "Scanning ") + RegistryScanner.Label(c).ToLowerInvariant() + "..."));
             List<RegIssue> issues = null;
             RunBackground(() => issues = scanner.Scan(selected), () =>
             {
@@ -97,7 +105,7 @@ namespace OpenCleaner.UI
                 list.BeginUpdate();
                 foreach (var g in issues.GroupBy(i => i.Category))
                 {
-                    var group = list.Groups.Add(g.Key, g.Key + " (" + g.Count() + ")");
+                    var group = list.Groups.Add(g.Key, RegistryScanner.Label(g.Key) + " (" + g.Count() + ")");
                     foreach (var i in g)
                     {
                         var it = new ListViewItem(i.Problem, group) { Tag = i, Checked = true };
@@ -109,9 +117,9 @@ namespace OpenCleaner.UI
                 Theme.Refit(list);
                 list.EndUpdate();
                 Reevaluate(btnFix);
-                if (issues.Count == 0) SetStatus("Nenhum problema encontrado.", StatusKind.Good);
-                else SetStatus(issues.Count + " problemas encontrados. Revise e clique em Corrigir marcados.");
-                results.SetEmpty("Nenhuma entrada órfã nas categorias verificadas.", "circle-check");
+                if (issues.Count == 0) SetStatus(L.T("Nenhum problema encontrado.", "No issues found."), StatusKind.Good);
+                else SetStatus(issues.Count + L.T(" problemas encontrados. Revise e clique em Corrigir marcados.", " issues found. Review them and click Fix checked."));
+                results.SetEmpty(L.T("Nenhuma entrada órfã nas categorias verificadas.", "No orphaned entries in the scanned categories."), "circle-check");
             });
         }
 
@@ -124,9 +132,9 @@ namespace OpenCleaner.UI
             if (!Util.IsAdmin() && items.Any(i => ((RegIssue)i.Tag).Hive == RegistryHive.LocalMachine))
             {
                 var answer = MessageBox.Show(this,
-                    "Alguns itens marcados são do sistema e só podem ser corrigidos com permissão de administrador.\n\n" +
-                    "Sim: reiniciar o OpenCleaner como administrador\nNão: corrigir só os itens do usuário atual\nCancelar: voltar",
-                    "Permissão de administrador", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Information);
+                    L.T("Alguns itens marcados são do sistema e só podem ser corrigidos com permissão de administrador.\n\n", "Some checked items belong to the system and can only be fixed with administrator permission.\n\n") +
+                    L.T("Sim: reiniciar o OpenCleaner como administrador\nNão: corrigir só os itens do usuário atual\nCancelar: voltar", "Yes: restart OpenCleaner as administrator\nNo: fix only the current user's items\nCancel: go back"),
+                    L.T("Permissão de administrador", "Administrator permission"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Information);
                 if (answer == DialogResult.Cancel) return;
                 if (answer == DialogResult.Yes) { Main.RestartElevated(); return; }
                 items = items.Where(i => ((RegIssue)i.Tag).Hive != RegistryHive.LocalMachine).ToList();
@@ -134,8 +142,8 @@ namespace OpenCleaner.UI
             }
             var issues = items.Select(i => (RegIssue)i.Tag).ToList();
 
-            var backup = MessageBox.Show(this, "Salvar um backup (.reg) das entradas antes de corrigir?\nCom ele dá para desfazer a correção depois.",
-                                         "Backup do registro", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+            var backup = MessageBox.Show(this, L.T("Salvar um backup (.reg) das entradas antes de corrigir?\nCom ele dá para desfazer a correção depois.", "Save a backup (.reg) of the entries before fixing?\nIt lets you undo the fix later."),
+                                         L.T("Backup do registro", "Registry backup"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
             if (backup == DialogResult.Cancel) return;
             if (backup == DialogResult.Yes)
             {
@@ -143,7 +151,7 @@ namespace OpenCleaner.UI
                 Directory.CreateDirectory(dir);
                 using (var d = new SaveFileDialog
                 {
-                    InitialDirectory = dir, Filter = "Arquivo de registro (*.reg)|*.reg",
+                    InitialDirectory = dir, Filter = L.T("Arquivo de registro (*.reg)|*.reg", "Registry file (*.reg)|*.reg"),
                     FileName = "registro-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".reg"
                 })
                 {
@@ -152,8 +160,8 @@ namespace OpenCleaner.UI
                     string error;
                     bool ok = RegistryScanner.Backup(issues, d.FileName, out error);
                     Cursor = Cursors.Default;
-                    if (!ok && MessageBox.Show(this, "O backup não foi salvo: " + error + "\n\nCorrigir mesmo assim?",
-                                               "Backup do registro", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                    if (!ok && MessageBox.Show(this, L.T("O backup não foi salvo: ", "The backup was not saved: ") + error + L.T("\n\nCorrigir mesmo assim?", "\n\nFix anyway?"),
+                                               L.T("Backup do registro", "Registry backup"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
                         return;
                 }
             }
@@ -169,9 +177,9 @@ namespace OpenCleaner.UI
             Theme.Refit(list);
             list.EndUpdate();
             Reevaluate(btnFix);
-            if (failed > 0) SetStatus(fixedCount + " problemas corrigidos · " + failed + " não puderam ser alterados", StatusKind.Danger);
-            else SetStatus(fixedCount + " problemas corrigidos.", StatusKind.Good);
-            results.SetEmpty("Todos os problemas marcados foram corrigidos.", "circle-check");
+            if (failed > 0) SetStatus(fixedCount + L.T(" problemas corrigidos · ", " issues fixed · ") + failed + L.T(" não puderam ser alterados", " could not be changed"), StatusKind.Danger);
+            else SetStatus(fixedCount + L.T(" problemas corrigidos.", " issues fixed."), StatusKind.Good);
+            results.SetEmpty(L.T("Todos os problemas marcados foram corrigidos.", "All checked issues were fixed."), "circle-check");
         }
 
         void OpenInRegedit()

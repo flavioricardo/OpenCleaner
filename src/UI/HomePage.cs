@@ -84,9 +84,9 @@ namespace OpenCleaner.UI
             // Legenda: amostra + rótulo + número
             float y = h + Theme.S(14f);
             float x = 0;
-            x = Legend(g, x, y, Brushes.Transparent, Theme.Ardosia, "Usado", Util.FormatSize((long)(used - j)), false);
-            x = Legend(g, x, y, null, Theme.Verde, "Pode ser liberado", junk < 0 ? "verifique para saber" : Util.FormatSize((long)j), true);
-            Legend(g, x, y, null, Color.FromArgb(0xC9, 0xD0, 0xD8), "Livre", Util.FormatSize((long)free), false);
+            x = Legend(g, x, y, Brushes.Transparent, Theme.Ardosia, L.T("Usado", "Used"), Util.FormatSize((long)(used - j)), false);
+            x = Legend(g, x, y, null, Theme.Verde, L.T("Pode ser liberado", "Can be freed"), junk < 0 ? L.T("verifique para saber", "check to find out") : Util.FormatSize((long)j), true);
+            Legend(g, x, y, null, Color.FromArgb(0xC9, 0xD0, 0xD8), L.T("Livre", "Free"), Util.FormatSize((long)free), false);
         }
 
         float Legend(Graphics g, float x, float y, Brush unused, Color color, string label, string value, bool hatched)
@@ -174,7 +174,7 @@ namespace OpenCleaner.UI
         bool busy;
 
         public HomePage(MainForm main)
-            : base(main, "Verificação de saúde", "Quanto espaço dá para recuperar e o que mais merece atenção neste computador.")
+            : base(main, L.T("Verificação de saúde", "Health check"), L.T("Quanto espaço dá para recuperar e o que mais merece atenção neste computador.", "How much space you can get back and what else needs attention on this computer."))
         {
             // ---- Cartão principal: o disco ----
             var hero = new Panel { Dock = DockStyle.Top, Height = Theme.S(250), BackColor = Theme.Papel, Padding = Theme.Pad(28, 24, 28, 22) };
@@ -184,13 +184,13 @@ namespace OpenCleaner.UI
             var bottomRow = new Panel { Dock = DockStyle.Bottom, Height = Theme.S(40) };
             verdict = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, ForeColor = Theme.Grafite, AutoEllipsis = true };
             var actions = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, WrapContents = false };
-            btnCheck = Theme.MakeButton("Verificar agora", ButtonKind.Primary, "heart-pulse");
+            btnCheck = Theme.MakeButton(L.T("Verificar agora", "Check now"), ButtonKind.Primary, "heart-pulse");
             btnCheck.Click += (s, e) => Check();
-            btnClean = Theme.MakeButton("Limpar", ButtonKind.Primary, "brush-cleaning");
+            btnClean = Theme.MakeButton(L.T("Limpar", "Clean"), ButtonKind.Primary, "brush-cleaning");
             btnClean.Visible = false;
             btnClean.Click += (s, e) => CleanJunk();
             // Depois da primeira verificação a ação principal passa a ser Limpar; verificar de novo vira secundária.
-            btnRecheck = Theme.MakeButton("Verificar de novo", ButtonKind.Secondary, "refresh-cw");
+            btnRecheck = Theme.MakeButton(L.T("Verificar de novo", "Check again"), ButtonKind.Secondary, "refresh-cw");
             btnRecheck.Visible = false;
             btnRecheck.Click += (s, e) => Check();
             actions.Controls.Add(btnClean);
@@ -205,7 +205,7 @@ namespace OpenCleaner.UI
             hero.Controls.Add(new Panel { Dock = DockStyle.Top, Height = Theme.S(16) });
 
             var head = new Panel { Dock = DockStyle.Top, Height = Theme.S(78) };
-            var eyebrow = Theme.SectionLabel("Disco do sistema");
+            var eyebrow = Theme.SectionLabel(L.T("Disco do sistema", "System drive"));
             eyebrow.Location = Theme.Pt(0, 0);
             headline = new Label { Font = Theme.Big, AutoSize = true, Location = Theme.Pt(-3, 18) };
             headlineSub = new Label { ForeColor = Theme.Grafite, AutoSize = true };
@@ -215,12 +215,12 @@ namespace OpenCleaner.UI
 
             // ---- Outros resultados ----
             cards = new FlowLayoutPanel { Dock = DockStyle.Top, Height = Theme.S(168), WrapContents = false };
-            registry = new ResultCard("database", "Registro", "Entradas que apontam para programas e arquivos que não existem mais.",
-                                      "Revisar no Registro", () => Main.Navigate("registry"));
-            startup = new ResultCard("power", "Inicialização", "Programas que abrem junto com o Windows e deixam a entrada mais lenta.",
-                                     "Gerenciar inicialização", () => Main.Navigate("startup"));
-            updates = new ResultCard("refresh-cw", "Atualizações", "Programas instalados que têm versão mais nova disponível.",
-                                     "Atualizar programas", () => Main.Navigate("updates"));
+            registry = new ResultCard("database", L.T("Registro", "Registry"), L.T("Entradas que apontam para programas e arquivos que não existem mais.", "Entries that point to programs and files that no longer exist."),
+                                      L.T("Revisar no Registro", "Review in Registry"), () => Main.Navigate("registry"));
+            startup = new ResultCard("power", L.T("Inicialização", "Startup"), L.T("Programas que abrem junto com o Windows e deixam a entrada mais lenta.", "Programs that open with Windows and slow down sign-in."),
+                                     L.T("Gerenciar inicialização", "Manage startup"), () => Main.Navigate("startup"));
+            updates = new ResultCard("refresh-cw", L.T("Atualizações", "Updates"), L.T("Programas instalados que têm versão mais nova disponível.", "Installed programs that have a newer version available."),
+                                     L.T("Atualizar programas", "Update programs"), () => Main.Navigate("updates"));
             updates.Margin = Padding.Empty;
             cards.Controls.AddRange(new Control[] { registry, startup, updates });
             cards.Resize += (s, e) =>
@@ -237,7 +237,7 @@ namespace OpenCleaner.UI
             Body.Controls.Add(hero);
 
             UpdateDisk(0, false);
-            verdict.Text = "A verificação só olha: nada é apagado ou alterado até você confirmar.";
+            verdict.Text = L.T("A verificação só olha: nada é apagado ou alterado até você confirmar.", "The check only looks: nothing is deleted or changed until you confirm.");
         }
 
         protected override bool ShowStatusRow { get { return false; } }
@@ -260,7 +260,7 @@ namespace OpenCleaner.UI
             }
             catch { }
             string ram = "";
-            try { ram = Util.FormatSize((long)new Microsoft.VisualBasic.Devices.ComputerInfo().TotalPhysicalMemory) + " de RAM"; }
+            try { ram = Util.FormatSize((long)new Microsoft.VisualBasic.Devices.ComputerInfo().TotalPhysicalMemory) + L.T(" de RAM", " of RAM"); }
             catch { }
             return string.Join("  ·  ", new[] { Environment.MachineName, os, cpu, ram }.Where(s => !string.IsNullOrEmpty(s)));
         }
@@ -270,8 +270,8 @@ namespace OpenCleaner.UI
             try
             {
                 drive = new DriveInfo(Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.Windows)));
-                headline.Text = Util.FormatSize(drive.AvailableFreeSpace) + " livres";
-                headlineSub.Text = "de " + Util.FormatSize(drive.TotalSize) + " no disco " + drive.Name.TrimEnd('\\');
+                headline.Text = Util.FormatSize(drive.AvailableFreeSpace) + L.T(" livres", " free");
+                headlineSub.Text = L.T("de ", "of ") + Util.FormatSize(drive.TotalSize) + L.T(" no disco ", " on drive ") + drive.Name.TrimEnd('\\');
                 headline.ForeColor = drive.AvailableFreeSpace < drive.TotalSize / 10 ? Theme.Ambar : Theme.Tinta;
                 meter.Set(drive.TotalSize, drive.AvailableFreeSpace, junkResults == null && !animate ? -1 : junk, animate);
             }
@@ -297,17 +297,17 @@ namespace OpenCleaner.UI
                 var rules = Main.DetectedRules().Where(r => Main.Settings.IsRuleOn(r)).ToList();
                 foreach (var r in rules)
                 {
-                    Ui(() => verdict.Text = "Analisando " + r.FullName + "...");
+                    Ui(() => verdict.Text = L.T("Analisando ", "Analyzing ") + r.FullName + "...");
                     results.Add(engine.Analyze(r));
                 }
-                Ui(() => verdict.Text = "Verificando o registro...");
+                Ui(() => verdict.Text = L.T("Verificando o registro...", "Checking the registry..."));
                 issues = new RegistryScanner().Scan(RegistryScanner.Categories.Where(c => !Main.Settings.RegistryDisabled.Contains(c)));
                 var st = Startup.List();
                 startupOn = st.Count(e => e.Enabled);
                 startupTotal = st.Count;
                 if (Winget.IsAvailable(out wingetVersion))
                 {
-                    Ui(() => verdict.Text = "Procurando atualizações de programas...");
+                    Ui(() => verdict.Text = L.T("Procurando atualizações de programas...", "Looking for program updates..."));
                     try { outdated = Winget.ListUpgrades(); }
                     catch { }
                 }
@@ -322,21 +322,21 @@ namespace OpenCleaner.UI
                 UpdateDisk(bytes, false);
                 if (bytes > 0)
                 {
-                    verdict.Text = Util.FormatSize(bytes) + " em " + junkResults.Count + " categorias de arquivos desnecessários (itens marcados na Limpeza personalizada).";
+                    verdict.Text = Util.FormatSize(bytes) + L.T(" em ", " in ") + junkResults.Count + L.T(" categorias de arquivos desnecessários (itens marcados na Limpeza personalizada).", " categories of unneeded files (items checked in Custom clean).");
                     verdict.ForeColor = Theme.Tinta;
-                    btnClean.Text = "Limpar " + Util.FormatSize(bytes);
+                    btnClean.Text = L.T("Limpar ", "Clean ") + Util.FormatSize(bytes);
                     btnClean.Visible = true;
                 }
                 else
                 {
-                    verdict.Text = "Nenhum arquivo desnecessário nos itens marcados.";
+                    verdict.Text = L.T("Nenhum arquivo desnecessário nos itens marcados.", "No unneeded files in the checked items.");
                     verdict.ForeColor = Theme.Verde;
                 }
 
-                registry.ShowResult(issues.Count.ToString(), issues.Count == 0 ? "nenhuma entrada órfã" : "entradas órfãs para revisar", issues.Count > 0, issues.Count > 0);
-                startup.ShowResult(startupOn.ToString(), "de " + startupTotal + " programas abrem com o Windows", startupTotal > 0, startupOn > 10);
+                registry.ShowResult(issues.Count.ToString(), issues.Count == 0 ? L.T("nenhuma entrada órfã", "no orphaned entries") : L.T("entradas órfãs para revisar", "orphaned entries to review"), issues.Count > 0, issues.Count > 0);
+                startup.ShowResult(startupOn.ToString(), L.T("de ", "of ") + startupTotal + L.T(" programas abrem com o Windows", " programs open with Windows"), startupTotal > 0, startupOn > 10);
                 if (outdated == null) updates.ShowResult("—", "winget não instalado", true);
-                else updates.ShowResult(outdated.Count.ToString(), outdated.Count == 0 ? "tudo atualizado" : "com versão nova disponível", outdated.Count > 0, outdated.Count > 0);
+                else updates.ShowResult(outdated.Count.ToString(), outdated.Count == 0 ? L.T("tudo atualizado", "everything up to date") : L.T("com versão nova disponível", "with a newer version available"), outdated.Count > 0, outdated.Count > 0);
             });
         }
 
@@ -345,7 +345,7 @@ namespace OpenCleaner.UI
             if (busy || junkResults == null || junkResults.Count == 0) return;
             var rules = junkResults.Select(r => r.Rule).ToList();
             if (Main.Settings.ConfirmClean &&
-                MessageBox.Show(this, "Apagar " + Util.FormatSize(junkResults.Sum(r => r.Bytes)) + " de arquivos desnecessários?", "Limpar",
+                MessageBox.Show(this, L.T("Apagar ", "Delete ") + Util.FormatSize(junkResults.Sum(r => r.Bytes)) + L.T(" de arquivos desnecessários?", " of unneeded files?"), L.T("Limpar", "Clean"),
                                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             rules = CleanFlow.HandleRunningApps(this, rules);
             if (rules == null) return;
@@ -360,7 +360,7 @@ namespace OpenCleaner.UI
             {
                 foreach (var rule in rules)
                 {
-                    Ui(() => verdict.Text = "Limpando " + rule.FullName + "...");
+                    Ui(() => verdict.Text = L.T("Limpando ", "Cleaning ") + rule.FullName + "...");
                     var r = engine.Analyze(rule);
                     engine.Clean(r);
                     freed += r.Freed;
@@ -373,7 +373,7 @@ namespace OpenCleaner.UI
                 btnRecheck.Enabled = true;
                 junkResults = null;
                 UpdateDisk(left, true); // o trecho hachurado encolhe até o que ficou em uso
-                verdict.Text = Util.FormatSize(freed) + " liberados." + (failed > 0 ? " " + failed + " arquivos em uso ficaram para trás." : "");
+                verdict.Text = Util.FormatSize(freed) + L.T(" liberados.", " freed.") + (failed > 0 ? " " + failed + L.T(" arquivos em uso ficaram para trás.", " files in use were left behind.") : "");
                 verdict.ForeColor = Theme.Verde;
             });
         }

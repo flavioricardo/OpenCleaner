@@ -623,9 +623,10 @@ namespace OpenCleaner.UI
 
             string names = string.Join("\n", running.Select(g => "  • " + g.Key));
             var answer = MessageBox.Show(owner,
-                "Estes programas estão abertos e travam alguns dos arquivos a limpar:\n\n" + names +
-                "\n\nSim: fechar esses programas e continuar\nNão: pular os itens desses programas\nCancelar: voltar",
-                "Programas em execução", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
+                L.T("Estes programas estão abertos e travam alguns dos arquivos a limpar:\n\n", "These programs are open and lock some of the files to clean:\n\n") + names +
+                L.T("\n\nSim: fechar esses programas e continuar\nNão: pular os itens desses programas\nCancelar: voltar",
+                    "\n\nYes: close these programs and continue\nNo: skip these programs' items\nCancel: go back"),
+                L.T("Programas em execução", "Programs running"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
             if (answer == DialogResult.Cancel) return null;
 
             var groups = new HashSet<string>(running.Select(g => g.Key));
@@ -664,8 +665,8 @@ namespace OpenCleaner.UI
             MinimizeBox = false;
 
             var lv = Theme.MakeList();
-            Theme.Col(lv, "Local", 640);
-            Theme.Col(lv, "Tamanho", 110, HorizontalAlignment.Right);
+            Theme.Col(lv, L.T("Local", "Location"), 640);
+            Theme.Col(lv, L.T("Tamanho", "Size"), 110, HorizontalAlignment.Right);
             Theme.EnableSorting(lv);
             lv.Font = Theme.Mono;
             Controls.Add(lv);
@@ -689,15 +690,15 @@ namespace OpenCleaner.UI
                 lv.Items.Add(new ListViewItem(new[] { rk.Key + (rk.Value != null ? "  [" + rk.Value + "]" : ""), "registro" }));
             if (r.SpecialItems > 0)
             {
-                var it = new ListViewItem(r.Rule.Name + " (" + r.SpecialItems + " itens)");
+                var it = new ListViewItem(r.Rule.Name + " (" + r.SpecialItems + L.T(" itens)", " items)"));
                 Theme.SizeCell(it, r.Bytes - r.Sizes.Sum());
                 lv.Items.Add(it);
             }
             lv.EndUpdate();
 
-            info.Text = r.ItemCount + " itens, " + Util.FormatSize(r.Bytes) +
-                        (r.Files.Count > limit ? " (mostrando os primeiros " + limit + ")" : "") +
-                        " · clique duas vezes para abrir o local";
+            info.Text = r.ItemCount + L.T(" itens, ", " items, ") + Util.FormatSize(r.Bytes) +
+                        (r.Files.Count > limit ? L.T(" (mostrando os primeiros ", " (showing the first ") + limit + ")" : "") +
+                        L.T(" · clique duas vezes para abrir o local", " · double-click to open the location");
             lv.DoubleClick += (s, e) =>
             {
                 if (lv.SelectedItems.Count > 0 && lv.SelectedItems[0].Tag is string)

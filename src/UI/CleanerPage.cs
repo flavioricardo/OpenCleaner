@@ -20,29 +20,29 @@ namespace OpenCleaner.UI
         bool busy, treeLoaded;
 
         public CleanerPage(MainForm main)
-            : base(main, "Limpeza personalizada", "Escolha o que limpar, analise para ver quanto espaço volta e então execute a limpeza.")
+            : base(main, L.T("Limpeza personalizada", "Custom clean"), L.T("Escolha o que limpar, analise para ver quanto espaço volta e então execute a limpeza.", "Choose what to clean, analyze to see how much space comes back, then run the cleaner."))
         {
-            btnClean = AddAction("Executar limpeza", ButtonKind.Primary, "brush-cleaning", () => Run(CheckedRules(), true));
-            btnAnalyze = AddAction("Analisar", ButtonKind.Secondary, "search", () => Run(CheckedRules(), false));
-            btnStop = AddAction("Parar", ButtonKind.Secondary, "square", () => { if (engine != null) engine.Cancel = true; });
+            btnClean = AddAction(L.T("Executar limpeza", "Run cleaner"), ButtonKind.Primary, "brush-cleaning", () => Run(CheckedRules(), true));
+            btnAnalyze = AddAction(L.T("Analisar", "Analyze"), ButtonKind.Secondary, "search", () => Run(CheckedRules(), false));
+            btnStop = AddAction(L.T("Parar", "Stop"), ButtonKind.Secondary, "square", () => { if (engine != null) engine.Cancel = true; });
             btnStop.Visible = false;
-            SetStatus("Nada foi analisado ainda.");
+            SetStatus(L.T("Nada foi analisado ainda.", "Nothing has been analyzed yet."));
 
             // ---- Resultados ----
             var right = new Panel { Dock = DockStyle.Fill, Padding = Theme.Pad(16, 0, 0, 0) };
             var list = Theme.MakeList();
             Theme.Col(list, "Item", 290);
-            Theme.Col(list, "Itens", 70, HorizontalAlignment.Right);
-            Theme.Col(list, "Tamanho", 100, HorizontalAlignment.Right);
-            Theme.Col(list, "Observação", 200);
+            Theme.Col(list, L.T("Itens", "Items"), 70, HorizontalAlignment.Right);
+            Theme.Col(list, L.T("Tamanho", "Size"), 100, HorizontalAlignment.Right);
+            Theme.Col(list, L.T("Observação", "Note"), 200);
             Theme.EnableSorting(list);
             list.DoubleClick += (s, e) => ShowDetails();
             var menu = new ContextMenuStrip { Font = Theme.Base };
-            menu.Items.Add("Ver arquivos", null, (s, e) => ShowDetails());
-            menu.Items.Add("Limpar somente este item", null, (s, e) => CleanSelectedOnly());
+            menu.Items.Add(L.T("Ver arquivos", "View files"), null, (s, e) => ShowDetails());
+            menu.Items.Add(L.T("Limpar somente este item", "Clean only this item"), null, (s, e) => CleanSelectedOnly());
             list.ContextMenuStrip = menu;
             results = new ListCard(list) { Dock = DockStyle.Fill };
-            results.SetEmpty("Marque à esquerda o que deseja limpar e clique em Analisar.\nNada é apagado na análise.", "brush-cleaning");
+            results.SetEmpty(L.T("Marque à esquerda o que deseja limpar e clique em Analisar.\nNada é apagado na análise.", "Check what you want to clean on the left and click Analyze.\nNothing is deleted during analysis."), "brush-cleaning");
             right.Controls.Add(results);
             Body.Controls.Add(right);
 
@@ -66,14 +66,14 @@ namespace OpenCleaner.UI
                 if (e.KeyCode == Keys.Space && tree.SelectedNode != null) { Toggle(tree.SelectedNode); e.Handled = true; }
             };
             var tmenu = new ContextMenuStrip { Font = Theme.Base };
-            tmenu.Items.Add("Restaurar seleção padrão", null, (s, e) =>
+            tmenu.Items.Add(L.T("Restaurar seleção padrão", "Restore default selection"), null, (s, e) =>
             {
                 foreach (var r in Main.Rules) Main.Settings.Rules.Remove(r.Id);
                 Main.Settings.Save();
                 ReloadTree();
             });
-            tmenu.Items.Add("Expandir tudo", null, (s, e) => tree.ExpandAll());
-            tmenu.Items.Add("Recolher tudo", null, (s, e) => tree.CollapseAll());
+            tmenu.Items.Add(L.T("Expandir tudo", "Expand all"), null, (s, e) => tree.ExpandAll());
+            tmenu.Items.Add(L.T("Recolher tudo", "Collapse all"), null, (s, e) => tree.CollapseAll());
             tree.ContextMenuStrip = tmenu;
             left.Controls.Add(tree);
             Body.Controls.Add(left);
@@ -125,7 +125,7 @@ namespace OpenCleaner.UI
         {
             treeLoaded = true;
             tree.Nodes.Clear();
-            tree.Nodes.Add("Carregando itens...");
+            tree.Nodes.Add(L.T("Carregando itens...", "Loading items..."));
             List<CleanRule> rules = null;
             RunBackground(() => rules = Main.DetectedRules(), () => FillTree(rules));
         }
@@ -138,7 +138,7 @@ namespace OpenCleaner.UI
                             .OrderBy(c => { int i = Array.IndexOf(CategoryOrder, c); return i < 0 ? 99 : i; }).ToList();
             foreach (var cat in cats)
             {
-                var catNode = tree.Nodes.Add(cat);
+                var catNode = tree.Nodes.Add(L.Category(cat));
                 catNode.NodeFont = Theme.Bold;
                 var inCat = rules.Where(r => r.Category == cat).ToList();
                 var groups = inCat.Select(r => r.Group).Distinct().ToList();
@@ -184,7 +184,7 @@ namespace OpenCleaner.UI
             if (rule != null)
             {
                 if (on && rule.Warning != null &&
-                    MessageBox.Show(this, rule.Warning + "\n\nMarcar este item?", rule.FullName,
+                    MessageBox.Show(this, rule.Warning + L.T("\n\nMarcar este item?", "\n\nCheck this item?"), rule.FullName,
                                     MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
                     return;
                 node.StateImageIndex = on ? On : Off;
@@ -257,14 +257,14 @@ namespace OpenCleaner.UI
             if (busy) return;
             if (rules.Count == 0)
             {
-                SetStatus("Marque ao menos um item na lista à esquerda.", StatusKind.Warning);
+                SetStatus(L.T("Marque ao menos um item na lista à esquerda.", "Check at least one item in the list on the left."), StatusKind.Warning);
                 return;
             }
             if (clean)
             {
                 if (Main.Settings.ConfirmClean &&
-                    MessageBox.Show(this, "Os arquivos dos " + rules.Count + " itens marcados serão apagados permanentemente.\n\nExecutar a limpeza?",
-                                    "Executar limpeza", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                    MessageBox.Show(this, L.T("Os arquivos dos ", "The files of the ") + rules.Count + L.T(" itens marcados serão apagados permanentemente.\n\nExecutar a limpeza?", " checked items will be permanently deleted.\n\nRun the cleaner?"),
+                                    L.T("Executar limpeza", "Run cleaner"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                     return;
                 rules = CleanFlow.HandleRunningApps(this, rules);
                 if (rules == null) return;
@@ -289,12 +289,12 @@ namespace OpenCleaner.UI
                     int index = i;
                     Ui(() =>
                     {
-                        SetStatus((clean ? "Limpando " : "Analisando ") + rule.FullName + "...");
+                        SetStatus((clean ? L.T("Limpando ", "Cleaning ") : L.T("Analisando ", "Analyzing ")) + rule.FullName + "...");
                         Progress.Value = index;
                     });
                     var res = eng.Analyze(rule);
                     if (rule.Processes.Count > 0 && Util.FindProcesses(rule.Processes).Count > 0 && res.Note == null)
-                        res.Note = "Programa aberto: alguns arquivos podem estar em uso";
+                        res.Note = L.T("Programa aberto: alguns arquivos podem estar em uso", "Program open: some files may be in use");
                     if (clean) eng.Clean(res);
                     all.Add(res);
                     Ui(() => AddRow(res, clean));
@@ -308,17 +308,17 @@ namespace OpenCleaner.UI
                 {
                     long freed = all.Sum(r => r.Freed);
                     int failed = all.Sum(r => r.Failed);
-                    SetStatus((eng.Cancel ? "Limpeza interrompida: " : "Limpeza concluída: ") + Util.FormatSize(freed) + " liberados em " + secs +
-                              (failed > 0 ? " · " + failed + " itens em uso ficaram para trás" : ""), StatusKind.Good);
+                    SetStatus((eng.Cancel ? L.T("Limpeza interrompida: ", "Cleaning stopped: ") : L.T("Limpeza concluída: ", "Cleaning complete: ")) + Util.FormatSize(freed) + L.T(" liberados em ", " freed in ") + secs +
+                              (failed > 0 ? " · " + failed + L.T(" itens em uso ficaram para trás", " items in use were left behind") : ""), StatusKind.Good);
                 }
                 else
                 {
                     long bytes = all.Sum(r => r.Bytes);
                     int items = all.Sum(r => r.ItemCount);
-                    SetStatus((eng.Cancel ? "Análise interrompida: " : "Análise concluída: ") + Util.FormatSize(bytes) +
-                              " podem ser liberados (" + items + " itens, " + secs + ")");
+                    SetStatus((eng.Cancel ? L.T("Análise interrompida: ", "Analysis stopped: ") : L.T("Análise concluída: ", "Analysis complete: ")) + Util.FormatSize(bytes) +
+                              L.T(" podem ser liberados (", " can be freed (") + items + L.T(" itens, ", " items, ") + secs + ")");
                 }
-                results.SetEmpty(clean ? "Nada restou para limpar nos itens marcados." : "Os itens marcados já estão limpos.", "circle-check");
+                results.SetEmpty(clean ? L.T("Nada restou para limpar nos itens marcados.", "Nothing left to clean in the checked items.") : L.T("Os itens marcados já estão limpos.", "The checked items are already clean."), "circle-check");
             });
         }
 
@@ -326,14 +326,14 @@ namespace OpenCleaner.UI
         {
             if (r.ItemCount == 0 && r.Failed == 0 && r.Note == null) return;
             var list = results.List;
-            ListViewGroup group = list.Groups.Cast<ListViewGroup>().FirstOrDefault(g => g.Header == r.Rule.Category);
-            if (group == null) group = list.Groups.Add(r.Rule.Category, r.Rule.Category);
+            ListViewGroup group = list.Groups.Cast<ListViewGroup>().FirstOrDefault(g => g.Name == r.Rule.Category);
+            if (group == null) group = list.Groups.Add(r.Rule.Category, L.Category(r.Rule.Category));
             var it = new ListViewItem(r.Rule.FullName, group) { Tag = r };
             var count = clean ? r.Removed : r.ItemCount;
             it.SubItems.Add(new ListViewItem.ListViewSubItem(it, count.ToString("N0")) { Tag = (long)count });
             Theme.SizeCell(it, clean ? r.Freed : r.Bytes);
             string note = r.Note ?? "";
-            if (clean && r.Failed > 0) note = r.Failed + " em uso ou sem permissão" + (note.Length > 0 ? " · " + note : "");
+            if (clean && r.Failed > 0) note = r.Failed + L.T(" em uso ou sem permissão", " in use or without permission") + (note.Length > 0 ? " · " + note : "");
             it.SubItems.Add(note);
             if (r.Failed > 0 || r.Note != null) it.ForeColor = Theme.Ambar;
             list.Items.Add(it);

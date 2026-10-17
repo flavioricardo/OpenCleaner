@@ -57,6 +57,19 @@ static class SmokeTest
         Check(rules.Count > 40, "mais de 40 regras embutidas");
         Check(rules.Select(r => r.Id).Distinct().Count() == rules.Count, "ids de regra únicos");
 
+        Console.WriteLine("== Idiomas ==");
+        L.Init(L.En);
+        var rulesEn = RuleCatalog.LoadAll(settings);
+        Check(rulesEn.Select(r => r.Id).OrderBy(x => x).SequenceEqual(rules.Select(r => r.Id).OrderBy(x => x)),
+              "IDs das regras iguais em português e inglês (seleção salva vale nos dois)");
+        var same = new HashSet<string> { "Cookies", "Cache", "Logs" };
+        var untranslated = rulesEn.Where(r => r.Source == "builtin" && r.Name == r.KeyName && !same.Contains(r.Name)).ToList();
+        foreach (var r in untranslated) Console.WriteLine("    sem inglês: " + r.FullName);
+        Check(untranslated.Count == 0, "todos os itens embutidos têm nome em inglês");
+        Check(RegistryScanner.Label(RegistryScanner.Categories[0]) == "Missing shared DLLs", "categorias do registro em inglês");
+        L.Init(L.Pt);
+        Check(RegistryScanner.Label(RegistryScanner.Categories[0]) == RegistryScanner.Categories[0], "categorias do registro em português");
+
         var sw = Stopwatch.StartNew();
         var detected = rules.Where(r => r.IsDetected()).ToList();
         Console.WriteLine("  detectadas: " + detected.Count + " em " + sw.ElapsedMilliseconds + " ms");
@@ -208,7 +221,7 @@ static class SmokeTest
 
         Console.WriteLine("== Capturas de tela ==");
         Application.EnableVisualStyles();
-        var form = new OpenCleaner.UI.MainForm();
+        var form = new OpenCleaner.UI.MainForm(L.Pt);
         form.StartPosition = FormStartPosition.Manual;
         form.Location = new Point(-3000, 0);
         form.Show();
@@ -259,12 +272,29 @@ static class SmokeTest
             bool done = waitFor(() => doneText == null ? b.Visible && b.Enabled : FindButton(form, doneText) != null, secs);
             pump(1);
             Check(done, page + ": \"" + button + "\" terminou");
-            shot(page + "-result");
+            shot(page + (L.English ? "-en" : "") + "-result");
         };
         run("home", "Verificar agora", "Verificar de novo", 120);
         run("clean", "Analisar", null, 120);
         run("registry", "Procurar problemas", null, 60);
         form.Close();
+
+        Console.WriteLine("== Telas em inglês ==");
+        form = new OpenCleaner.UI.MainForm(L.En);
+        form.StartPosition = FormStartPosition.Manual;
+        form.Location = new Point(-3000, 0);
+        form.Show();
+        foreach (var page in new[] { "home", "clean", "registry", "updates", "drivers", "uninstall", "startup", "disk", "dupes", "options" })
+        {
+            form.Navigate(page);
+            pump(page == "updates" ? 25 : page == "clean" || page == "uninstall" ? 6 : 1.5);
+            shot(page + "-en");
+        }
+        run("home", "Check now", "Check again", 120);
+        run("clean", "Analyze", null, 120);
+        run("registry", "Scan for issues", null, 60);
+        form.Close();
+        L.Init(L.Pt);
 
         Console.WriteLine(failures == 0 ? "\nTUDO OK" : "\n" + failures + " FALHA(S)");
         return failures;

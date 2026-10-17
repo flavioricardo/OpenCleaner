@@ -24,6 +24,7 @@ namespace OpenCleaner.Core
         public bool SecureDelete;
         public bool ConfirmClean = true;
         public bool LoadWinapp2 = true;
+        public string Language = L.Auto; // auto | pt | en
 
         public bool IsRuleOn(CleanRule r)
         {
@@ -63,6 +64,7 @@ namespace OpenCleaner.Core
                         else if (k == "SecureDelete") s.SecureDelete = b;
                         else if (k == "ConfirmClean") s.ConfirmClean = b;
                         else if (k == "LoadWinapp2") s.LoadWinapp2 = b;
+                        else if (k == "Language") s.Language = v == L.Pt || v == L.En ? v : L.Auto;
                         break;
                 }
             }
@@ -98,6 +100,7 @@ namespace OpenCleaner.Core
             sb.AppendLine("SecureDelete=" + B(SecureDelete));
             sb.AppendLine("ConfirmClean=" + B(ConfirmClean));
             sb.AppendLine("LoadWinapp2=" + B(LoadWinapp2));
+            sb.AppendLine("Language=" + Language);
             sb.AppendLine("[Rules]");
             foreach (var kv in Rules.OrderBy(k => k.Key)) sb.AppendLine(kv.Key + "=" + B(kv.Value));
             sb.AppendLine("[Include]");

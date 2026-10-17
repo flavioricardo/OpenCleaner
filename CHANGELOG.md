@@ -22,5 +22,7 @@ Primeira versão pública.
 - Instalador por usuário (sem administrador) com desinstalação em *Configurações > Apps*, versão
   portátil e somas SHA-256.
 - Interface com navegação por teclado, foco visível, contraste AA e escala por DPI.
+- App, instalador e desinstalador em português e inglês, com o idioma do Windows por padrão, seletor no instalador
+  e em *Opções*; as seleções de limpeza salvas valem nos dois idiomas.
 
 [1.0.0]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.0.0

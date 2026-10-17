@@ -81,7 +81,7 @@ namespace OpenCleaner.Core
         {
             string output;
             int code = Run("upgrade" + Common, out output, 5 * 60 * 1000);
-            if (code == -1) throw new TimeoutException("O winget demorou demais para responder.");
+            if (code == -1) throw new TimeoutException(L.T("O winget demorou demais para responder.", "winget took too long to respond."));
             return Parse(output);
         }
 
@@ -135,7 +135,7 @@ namespace OpenCleaner.Core
                            out output, 30 * 60 * 1000, progress);
             var meaningful = output.Split('\n').Select(l => l.Trim()).Where(l => l.Any(char.IsLetter)).ToList();
             message = meaningful.Count > 0 ? meaningful.Last() : "";
-            if (code == -1) message = "Tempo esgotado";
+            if (code == -1) message = L.T("Tempo esgotado", "Timed out");
             return code == 0;
         }
     }
@@ -251,12 +251,12 @@ namespace OpenCleaner.Core
                 coll.Add(u);
             }
 
-            progress("Baixando " + drivers.Count + " driver(s)...");
+            progress(L.T("Baixando ", "Downloading ") + drivers.Count + L.T(" driver(s)...", " driver(s)..."));
             dynamic downloader = Session.CreateUpdateDownloader();
             downloader.Updates = coll;
             downloader.Download();
 
-            progress("Instalando " + drivers.Count + " driver(s)...");
+            progress(L.T("Instalando ", "Installing ") + drivers.Count + L.T(" driver(s)...", " driver(s)..."));
             dynamic installer = Session.CreateUpdateInstaller();
             installer.Updates = coll;
             dynamic result = installer.Install();
@@ -289,7 +289,7 @@ namespace OpenCleaner.Core
                     var outp = sr.InvokeMethod("CreateRestorePoint", args, null);
                     uint rv = Convert.ToUInt32(outp["ReturnValue"]);
                     if (rv == 0) return true;
-                    error = rv == 1058 ? "a Proteção do Sistema está desativada" : "código " + rv;
+                    error = rv == 1058 ? L.T("a Proteção do Sistema está desativada", "System Protection is turned off") : L.T("código ", "code ") + rv;
                     return false;
                 }
             }

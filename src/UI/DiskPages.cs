@@ -65,10 +65,10 @@ namespace OpenCleaner.UI
         string customFolder;
 
         public DiskPage(MainForm main)
-            : base(main, "Analisador de disco", "Descubra que tipos de arquivo ocupam mais espaço e quais são os maiores.")
+            : base(main, L.T("Analisador de disco", "Disk analyzer"), L.T("Descubra que tipos de arquivo ocupam mais espaço e quais são os maiores.", "Find out which file types take up the most space and which files are the largest."))
         {
-            btnScan = AddAction("Analisar", ButtonKind.Primary, "search", Scan);
-            btnStop = AddAction("Parar", ButtonKind.Secondary, "square", () => { if (analyzer != null) analyzer.Cancel = true; });
+            btnScan = AddAction(L.T("Analisar", "Analyze"), ButtonKind.Primary, "search", Scan);
+            btnStop = AddAction(L.T("Parar", "Stop"), ButtonKind.Secondary, "square", () => { if (analyzer != null) analyzer.Cancel = true; });
             btnStop.Visible = false;
 
             drives = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = Theme.S(290), Margin = Theme.Pad(0, 6, 8, 0), Font = Theme.Base };
@@ -76,31 +76,31 @@ namespace OpenCleaner.UI
                 drives.Items.Add(new DriveItem(d));
             if (drives.Items.Count > 0) drives.SelectedIndex = 0;
             drives.SelectedIndexChanged += (s, e) => customFolder = null;
-            btnFolder = Theme.MakeButton("Escolher pasta...", ButtonKind.Secondary, "folder-open");
+            btnFolder = Theme.MakeButton(L.T("Escolher pasta...", "Choose folder..."), ButtonKind.Secondary, "folder-open");
             btnFolder.Margin = Theme.Pad(0, 0, 0, 0);
             btnFolder.Click += (s, e) =>
             {
-                var f = Prompt.Folder(this, "Pasta a analisar");
+                var f = Prompt.Folder(this, L.T("Pasta a analisar", "Folder to analyze"));
                 if (f != null) { customFolder = f; Scan(); }
             };
             ToolbarLeft.Controls.Add(drives);
             ToolbarLeft.Controls.Add(btnFolder);
-            SetStatus("Escolha uma unidade ou pasta e clique em Analisar.");
+            SetStatus(L.T("Escolha uma unidade ou pasta e clique em Analisar.", "Choose a drive or folder and click Analyze."));
 
             // ---- Arquivos da categoria selecionada ----
             var fileList = Theme.MakeList();
-            Theme.Col(fileList, "Arquivo", 280);
-            Theme.Col(fileList, "Tamanho", 100, HorizontalAlignment.Right);
-            Theme.Col(fileList, "Modificado", 130);
-            Theme.Col(fileList, "Pasta", 300);
+            Theme.Col(fileList, L.T("Arquivo", "File"), 280);
+            Theme.Col(fileList, L.T("Tamanho", "Size"), 100, HorizontalAlignment.Right);
+            Theme.Col(fileList, L.T("Modificado", "Modified"), 130);
+            Theme.Col(fileList, L.T("Pasta", "Folder"), 300);
             Theme.EnableSorting(fileList);
             fileList.DoubleClick += (s, e) => OpenSelected();
             var menu = new ContextMenuStrip { Font = Theme.Base };
-            menu.Items.Add("Abrir local", null, (s, e) => OpenSelected());
-            menu.Items.Add("Mover para a Lixeira", null, (s, e) => RecycleSelected());
+            menu.Items.Add(L.T("Abrir local", "Open location"), null, (s, e) => OpenSelected());
+            menu.Items.Add(L.T("Mover para a Lixeira", "Move to Recycle Bin"), null, (s, e) => RecycleSelected());
             fileList.ContextMenuStrip = menu;
             files = new ListCard(fileList) { Dock = DockStyle.Fill };
-            files.SetEmpty("Os maiores arquivos de cada categoria aparecem aqui depois da análise.", "hard-drive");
+            files.SetEmpty(L.T("Os maiores arquivos de cada categoria aparecem aqui depois da análise.", "The largest files in each category show up here after the analysis."), "hard-drive");
             Body.Controls.Add(files);
             Body.Controls.Add(new Panel { Dock = DockStyle.Top, Height = Theme.S(14) });
 
@@ -112,10 +112,10 @@ namespace OpenCleaner.UI
             catList.SmallImageList = new ImageList { ImageSize = Theme.Sz(14, 26), ColorDepth = ColorDepth.Depth32Bit };
             for (int i = 0; i < DiskAnalyzer.CategoryNames.Length; i++)
                 catList.SmallImageList.Images.Add(Swatch(Palette[i % Palette.Length]));
-            Theme.Col(catList, "Categoria", 200);
-            Theme.Col(catList, "Tamanho", 110, HorizontalAlignment.Right);
-            Theme.Col(catList, "Parte do total", 120, HorizontalAlignment.Right);
-            Theme.Col(catList, "Arquivos", 120);
+            Theme.Col(catList, L.T("Categoria", "Category"), 200);
+            Theme.Col(catList, L.T("Tamanho", "Size"), 110, HorizontalAlignment.Right);
+            Theme.Col(catList, L.T("Parte do total", "Share of total"), 120, HorizontalAlignment.Right);
+            Theme.Col(catList, L.T("Arquivos", "Files"), 120);
             catList.SelectedIndexChanged += (s, e) => ShowCategory();
             catCard.Controls.Add(catList);
             var barHolder = new Panel { Dock = DockStyle.Top, Height = Theme.S(34), Padding = Theme.Pad(12, 12, 12, 8), BackColor = Theme.Papel };
@@ -144,8 +144,8 @@ namespace OpenCleaner.UI
             public DriveItem(DriveInfo d) { Drive = d; }
             public override string ToString()
             {
-                string label = string.IsNullOrEmpty(Drive.VolumeLabel) ? "Disco local" : Drive.VolumeLabel;
-                return Drive.Name.TrimEnd('\\') + " " + label + " · " + Util.FormatSize(Drive.AvailableFreeSpace) + " livres de " + Util.FormatSize(Drive.TotalSize);
+                string label = string.IsNullOrEmpty(Drive.VolumeLabel) ? L.T("Disco local", "Local disk") : Drive.VolumeLabel;
+                return Drive.Name.TrimEnd('\\') + " " + label + " · " + Util.FormatSize(Drive.AvailableFreeSpace) + L.T(" livres de ", " free of ") + Util.FormatSize(Drive.TotalSize);
             }
         }
 
@@ -166,7 +166,7 @@ namespace OpenCleaner.UI
             analyzer = new DiskAnalyzer();
             var a = analyzer;
             var timer = new Timer { Interval = 250 };
-            timer.Tick += (s, e) => SetStatus("Lendo " + a.ScannedFiles.ToString("N0") + " arquivos · " + a.CurrentDir);
+            timer.Tick += (s, e) => SetStatus(L.T("Lendo ", "Reading ") + a.ScannedFiles.ToString("N0") + L.T(" arquivos · ", " files · ") + a.CurrentDir);
             timer.Start();
             Dictionary<string, DiskCategory> result = null;
             RunBackground(() => result = a.Scan(root), () =>
@@ -178,8 +178,8 @@ namespace OpenCleaner.UI
                 btnFolder.Enabled = drives.Enabled = true;
                 data = result;
                 long total = result.Values.Sum(c => c.Bytes);
-                SetStatus((a.Cancel ? "Análise interrompida: " : "") + a.ScannedFiles.ToString("N0") + " arquivos somam " +
-                          Util.FormatSize(total) + " em " + root);
+                SetStatus((a.Cancel ? L.T("Análise interrompida: ", "Analysis stopped: ") : "") + a.ScannedFiles.ToString("N0") + L.T(" arquivos somam ", " files add up to ") +
+                          Util.FormatSize(total) + L.T(" em ", " in ") + root);
 
                 bar.Segments.Clear();
                 catList.BeginUpdate();
@@ -190,13 +190,13 @@ namespace OpenCleaner.UI
                     var it = new ListViewItem(c.Name, i) { Tag = c };
                     Theme.SizeCell(it, c.Bytes);
                     it.SubItems.Add(total == 0 ? "0%" : (100.0 * c.Bytes / total).ToString("0.0") + "%");
-                    it.SubItems.Add(new ListViewItem.ListViewSubItem(it, c.Count.ToString("N0") + " arquivos") { Tag = c.Count });
+                    it.SubItems.Add(new ListViewItem.ListViewSubItem(it, c.Count.ToString("N0") + L.T(" arquivos", " files")) { Tag = c.Count });
                     catList.Items.Add(it);
                 }
                 catList.EndUpdate();
                 bar.Total = total;
                 bar.Invalidate();
-                files.SetEmpty("Escolha uma categoria acima para ver os maiores arquivos.", "chart-pie");
+                files.SetEmpty(L.T("Escolha uma categoria acima para ver os maiores arquivos.", "Choose a category above to see the largest files."), "chart-pie");
                 if (catList.Items.Count > 0) catList.Items[0].Selected = true;
             });
         }
@@ -218,7 +218,7 @@ namespace OpenCleaner.UI
             }
             Theme.Refit(list);
             list.EndUpdate();
-            files.SetEmpty("Nenhum arquivo de " + c.Name.ToLowerInvariant() + " encontrado.", "chart-pie");
+            files.SetEmpty(L.T("Nenhum arquivo de ", "No ") + c.Name.ToLowerInvariant() + L.T(" encontrado.", " files found."), "chart-pie");
         }
 
         void OpenSelected()
@@ -230,15 +230,15 @@ namespace OpenCleaner.UI
         {
             var items = files.List.SelectedItems.Cast<ListViewItem>().ToList();
             if (items.Count == 0) return;
-            if (MessageBox.Show(this, "Mover " + items.Count + " arquivo(s) para a Lixeira?", "Mover para a Lixeira",
+            if (MessageBox.Show(this, L.T("Mover ", "Move ") + items.Count + L.T(" arquivo(s) para a Lixeira?", " file(s) to the Recycle Bin?"), L.T("Mover para a Lixeira", "Move to Recycle Bin"),
                                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             int moved = 0;
             foreach (var it in items)
             {
                 try { Util.SendToRecycleBin((string)it.Tag); files.List.Items.Remove(it); moved++; }
-                catch (Exception ex) { SetStatus("Não foi possível mover " + it.Text + ": " + ex.Message, StatusKind.Danger); break; }
+                catch (Exception ex) { SetStatus(L.T("Não foi possível mover ", "Could not move ") + it.Text + ": " + ex.Message, StatusKind.Danger); break; }
             }
-            if (moved > 0) SetStatus(moved + " arquivo(s) movidos para a Lixeira.", StatusKind.Good);
+            if (moved > 0) SetStatus(moved + L.T(" arquivo(s) movidos para a Lixeira.", " file(s) moved to the Recycle Bin."), StatusKind.Good);
         }
     }
 
@@ -254,50 +254,50 @@ namespace OpenCleaner.UI
         DuplicateFinder finder;
 
         public DuplicatePage(MainForm main)
-            : base(main, "Localizador de duplicados", "Encontra arquivos com conteúdo idêntico. Os que você excluir vão para a Lixeira.")
+            : base(main, L.T("Localizador de duplicados", "Duplicate finder"), L.T("Encontra arquivos com conteúdo idêntico. Os que você excluir vão para a Lixeira.", "Finds files with identical contents. The ones you delete go to the Recycle Bin."))
         {
-            btnFind = AddAction("Procurar", ButtonKind.Primary, "search", Find);
-            btnStop = AddAction("Parar", ButtonKind.Secondary, "square", () => { if (finder != null) finder.Cancel = true; });
+            btnFind = AddAction(L.T("Procurar", "Search"), ButtonKind.Primary, "search", Find);
+            btnStop = AddAction(L.T("Parar", "Stop"), ButtonKind.Secondary, "square", () => { if (finder != null) finder.Cancel = true; });
             btnStop.Visible = false;
 
             folder = new TextBox { Width = Theme.S(300), Text = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Margin = Theme.Pad(0, 6, 0, 0), Font = Theme.Base };
-            var browse = Theme.MakeIconButton("folder-open", "Escolher pasta");
-            browse.Click += (s, e) => { var f = Prompt.Folder(this, "Pasta onde procurar duplicados", folder.Text); if (f != null) folder.Text = f; };
+            var browse = Theme.MakeIconButton("folder-open", L.T("Escolher pasta", "Choose folder"));
+            browse.Click += (s, e) => { var f = Prompt.Folder(this, L.T("Pasta onde procurar duplicados", "Folder to search for duplicates"), folder.Text); if (f != null) folder.Text = f; };
             ToolbarLeft.Controls.Add(folder);
             ToolbarLeft.Controls.Add(browse);
-            SetStatus("Escolha uma pasta e clique em Procurar.");
+            SetStatus(L.T("Escolha uma pasta e clique em Procurar.", "Choose a folder and click Search."));
 
             // ---- Ações sobre a seleção, abaixo da lista ----
             var selectionBar = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = Theme.S(48), Padding = Theme.Pad(0, 10, 0, 0), WrapContents = false };
-            btnDelete = Theme.MakeButton("Mover marcados para a Lixeira", ButtonKind.Danger, "trash-2");
+            btnDelete = Theme.MakeButton(L.T("Mover marcados para a Lixeira", "Move checked to Recycle Bin"), ButtonKind.Danger, "trash-2");
             btnDelete.Margin = Theme.Pad(0, 0, 8, 0);
             btnDelete.Click += (s, e) => DeleteChecked();
-            var btnSelect = Theme.MakeButton("Marcar cópias (manter o mais antigo)", ButtonKind.Link, "list-checks");
+            var btnSelect = Theme.MakeButton(L.T("Marcar cópias (manter o mais antigo)", "Check copies (keep the oldest)"), ButtonKind.Link, "list-checks");
             btnSelect.Click += (s, e) => SelectCopies();
-            var btnClear = Theme.MakeButton("Desmarcar tudo", ButtonKind.Link, "x");
+            var btnClear = Theme.MakeButton(L.T("Desmarcar tudo", "Uncheck all"), ButtonKind.Link, "x");
             btnClear.Click += (s, e) => { foreach (ListViewItem it in results.List.Items) it.Checked = false; };
             selectionBar.Controls.AddRange(new Control[] { btnDelete, btnSelect, btnClear });
 
             var list = Theme.MakeList(true);
-            Theme.Col(list, "Arquivo", 260);
-            Theme.Col(list, "Tamanho", 100, HorizontalAlignment.Right);
-            Theme.Col(list, "Modificado", 130);
-            Theme.Col(list, "Pasta", 380);
+            Theme.Col(list, L.T("Arquivo", "File"), 260);
+            Theme.Col(list, L.T("Tamanho", "Size"), 100, HorizontalAlignment.Right);
+            Theme.Col(list, L.T("Modificado", "Modified"), 130);
+            Theme.Col(list, L.T("Pasta", "Folder"), 380);
             list.DoubleClick += (s, e) => { if (list.SelectedItems.Count > 0) Util.ShowInExplorer((string)list.SelectedItems[0].Tag); };
             results = new ListCard(list) { Dock = DockStyle.Fill };
-            results.SetEmpty("Arquivos iguais aparecem agrupados aqui.\nVocê escolhe quais cópias apagar; o mais antigo de cada grupo fica por padrão.", "copy");
+            results.SetEmpty(L.T("Arquivos iguais aparecem agrupados aqui.\nVocê escolhe quais cópias apagar; o mais antigo de cada grupo fica por padrão.", "Identical files show up grouped here.\nYou choose which copies to delete; the oldest in each group is kept by default."), "copy");
             Body.Controls.Add(results);
             Body.Controls.Add(selectionBar);
             BindToSelection(btnDelete, list, true);
 
             // ---- Filtros ----
             var filters = new FlowLayoutPanel { Dock = DockStyle.Top, Height = Theme.S(40), WrapContents = false, Padding = Theme.Pad(0, 0, 0, 8) };
-            filters.Controls.Add(new Label { Text = "Ignorar arquivos menores que", AutoSize = true, ForeColor = Theme.Grafite, Margin = Theme.Pad(0, 7, 6, 0) });
+            filters.Controls.Add(new Label { Text = L.T("Ignorar arquivos menores que", "Ignore files smaller than"), AutoSize = true, ForeColor = Theme.Grafite, Margin = Theme.Pad(0, 7, 6, 0) });
             minSize = new NumericUpDown { Minimum = 0, Maximum = 10000000, Value = 100, Width = Theme.S(80), Margin = Theme.Pad(0, 4, 4, 0), Font = Theme.Base };
             filters.Controls.Add(minSize);
             filters.Controls.Add(new Label { Text = "KB", AutoSize = true, ForeColor = Theme.Grafite, Margin = Theme.Pad(0, 7, 20, 0) });
-            matchName = new CheckBox { Text = "Exigir o mesmo nome", AutoSize = true, Margin = Theme.Pad(0, 6, 16, 0) };
-            skipHidden = new CheckBox { Text = "Ignorar arquivos ocultos e do sistema", AutoSize = true, Checked = true, Margin = Theme.Pad(0, 6, 0, 0) };
+            matchName = new CheckBox { Text = L.T("Exigir o mesmo nome", "Require the same name"), AutoSize = true, Margin = Theme.Pad(0, 6, 16, 0) };
+            skipHidden = new CheckBox { Text = L.T("Ignorar arquivos ocultos e do sistema", "Ignore hidden and system files"), AutoSize = true, Checked = true, Margin = Theme.Pad(0, 6, 0, 0) };
             filters.Controls.Add(matchName);
             filters.Controls.Add(skipHidden);
             Body.Controls.Add(filters);
@@ -305,7 +305,7 @@ namespace OpenCleaner.UI
 
         void Find()
         {
-            if (!Directory.Exists(folder.Text)) { SetStatus("A pasta \"" + folder.Text + "\" não existe.", StatusKind.Warning); return; }
+            if (!Directory.Exists(folder.Text)) { SetStatus(L.F("A pasta \"{0}\" não existe.", "The folder \"{0}\" does not exist.", folder.Text), StatusKind.Warning); return; }
             finder = new DuplicateFinder
             {
                 MinSize = (long)minSize.Value * 1024,
@@ -335,7 +335,7 @@ namespace OpenCleaner.UI
                 int n = 0;
                 foreach (var g in groups.Take(3000))
                 {
-                    var lg = list.Groups.Add("g" + n, "Grupo " + (++n) + " · " + g.Count + " cópias de " + Util.FormatSize(g[0].Size));
+                    var lg = list.Groups.Add("g" + n, L.T("Grupo ", "Group ") + (++n) + " · " + g.Count + L.T(" cópias de ", " copies of ") + Util.FormatSize(g[0].Size));
                     foreach (var fe in g)
                     {
                         var it = new ListViewItem(Path.GetFileName(fe.Path), lg) { Tag = fe.Path };
@@ -349,10 +349,10 @@ namespace OpenCleaner.UI
                 list.EndUpdate();
                 Reevaluate(btnDelete);
                 long waste = groups.Sum(g => g[0].Size * (g.Count - 1));
-                if (groups.Count == 0) SetStatus((f.Cancel ? "Busca interrompida. " : "") + "Nenhum arquivo duplicado encontrado.", StatusKind.Good);
-                else SetStatus((f.Cancel ? "Busca interrompida · " : "") + groups.Count + " grupos de duplicados · " + Util.FormatSize(waste) +
-                               " podem ser liberados" + (groups.Count > 3000 ? " (mostrando 3000 grupos)" : ""));
-                results.SetEmpty("Nenhum arquivo duplicado em " + root + ".", "circle-check");
+                if (groups.Count == 0) SetStatus((f.Cancel ? L.T("Busca interrompida. ", "Search stopped. ") : "") + L.T("Nenhum arquivo duplicado encontrado.", "No duplicate files found."), StatusKind.Good);
+                else SetStatus((f.Cancel ? L.T("Busca interrompida · ", "Search stopped · ") : "") + groups.Count + L.T(" grupos de duplicados · ", " duplicate groups · ") + Util.FormatSize(waste) +
+                               L.T(" podem ser liberados", " can be freed") + (groups.Count > 3000 ? L.T(" (mostrando 3000 grupos)", " (showing 3000 groups)") : ""));
+                results.SetEmpty(L.T("Nenhum arquivo duplicado em ", "No duplicate files in ") + root + ".", "circle-check");
             });
         }
 
@@ -373,9 +373,9 @@ namespace OpenCleaner.UI
             var items = list.CheckedItems.Cast<ListViewItem>().ToList();
             if (items.Count == 0) return;
             bool wholeGroup = list.Groups.Cast<ListViewGroup>().Any(g => g.Items.Count > 0 && g.Items.Cast<ListViewItem>().All(i => i.Checked));
-            string msg = "Mover " + items.Count + " arquivo(s) para a Lixeira?";
-            if (wholeGroup) msg = "Atenção: em algum grupo todas as cópias estão marcadas, e nenhuma sobraria.\n\n" + msg;
-            if (MessageBox.Show(this, msg, "Mover para a Lixeira", MessageBoxButtons.YesNo,
+            string msg = L.T("Mover ", "Move ") + items.Count + L.T(" arquivo(s) para a Lixeira?", " file(s) to the Recycle Bin?");
+            if (wholeGroup) msg = L.T("Atenção: em algum grupo todas as cópias estão marcadas, e nenhuma sobraria.\n\n", "Warning: in some group every copy is checked, so none would be left.\n\n") + msg;
+            if (MessageBox.Show(this, msg, L.T("Mover para a Lixeira", "Move to Recycle Bin"), MessageBoxButtons.YesNo,
                                 wholeGroup ? MessageBoxIcon.Warning : MessageBoxIcon.Question) != DialogResult.Yes) return;
             int ok = 0, failed = 0;
             list.BeginUpdate();
@@ -387,7 +387,7 @@ namespace OpenCleaner.UI
             Theme.Refit(list);
             list.EndUpdate();
             Reevaluate(btnDelete);
-            SetStatus(ok + " arquivo(s) movidos para a Lixeira" + (failed > 0 ? " · " + failed + " não puderam ser movidos" : "."),
+            SetStatus(ok + L.T(" arquivo(s) movidos para a Lixeira", " file(s) moved to the Recycle Bin") + (failed > 0 ? " · " + failed + L.T(" não puderam ser movidos", " could not be moved") : "."),
                       failed > 0 ? StatusKind.Danger : StatusKind.Good);
         }
     }

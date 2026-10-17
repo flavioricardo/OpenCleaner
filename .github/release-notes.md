@@ -6,6 +6,7 @@
 | [OpenCleaner-portable.zip](https://github.com/{REPO}/releases/download/{TAG}/OpenCleaner-portable.zip) | Versão portátil: extraia e abra o `OpenCleaner.exe`, sem instalar. |
 
 Requisitos: Windows 10 ou 11 (64 ou 32 bits). O .NET Framework necessário já vem no Windows.
+Idiomas: português e inglês (o instalador tem um seletor; depois, *Opções > Idioma · Language*).
 
 > **Aviso do SmartScreen:** o instalador ainda não tem assinatura digital, então o Windows pode mostrar
 > "O Windows protegeu o computador". Clique em **Mais informações** > **Executar assim mesmo**.

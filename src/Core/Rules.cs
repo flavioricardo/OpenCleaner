@@ -29,8 +29,10 @@ namespace OpenCleaner.Core
 
     class CleanRule
     {
-        public string Name;
+        public string Name;              // exibidos, no idioma da interface
         public string Group;
+        public string KeyName, KeyGroup;  // em português: identificam a regra nas configurações
+        public bool IsCustom;
         public string Category;
         public string Source = "builtin";
         public string Special;
@@ -45,7 +47,7 @@ namespace OpenCleaner.Core
         public List<RegKeySpec> RegKeys = new List<RegKeySpec>();
         public List<ExcludeSpec> Excludes = new List<ExcludeSpec>();
 
-        public string Id { get { return Source + "|" + Group + "|" + Name; } }
+        public string Id { get { return Source + "|" + (KeyGroup ?? Group) + "|" + (KeyName ?? Name); } }
         public string FullName { get { return Group + " - " + Name; } }
 
         /// <summary>O programa ao qual a regra se refere está instalado?</summary>
@@ -85,7 +87,7 @@ namespace OpenCleaner.Core
     {
         static readonly Dictionary<string, string> LangSec = new Dictionary<string, string>
         {
-            { "3021", "Aplicativos" }, { "3022", "Internet" }, { "3023", "Multimídia" }, { "3024", "Utilitários" },
+            { "3021", "Aplicativos|Applications" }, { "3022", "Internet|Internet" }, { "3023", "Multimídia|Multimedia" }, { "3024", "Utilitários|Utilities" },
             { "3025", "Windows" }, { "3026", "Firefox" }, { "3027", "Opera" }, { "3028", "Safari" },
             { "3029", "Google Chrome" }, { "3030", "Thunderbird" }, { "3031", "Windows Store" }, { "3032", "Chromium" }
         };
@@ -106,16 +108,35 @@ namespace OpenCleaner.Core
             CleanRule cur = null;
             string section = null;
             string winapp2Section = null, langSec = null;
+            string groupEn = null, itemEn = null, warningEn = null;
             Action flush = () =>
             {
                 if (cur == null) return;
-                if (cur.Group == null)
+                string groupKey = cur.Group;
+                if (groupKey == null)
                 {
+                    // winapp2.ini: grupo vem de Section= ou de LangSecRef (pares "português|inglês")
                     string g = winapp2Section;
-                    if (g == null && langSec != null) LangSec.TryGetValue(langSec, out g);
-                    cur.Group = g ?? "Outros";
+                    if (g == null && langSec != null && LangSec.TryGetValue(langSec, out g))
+                    {
+                        var pair = g.Split('|');
+                        g = pair[0];
+                        if (pair.Length > 1) groupEn = groupEn ?? pair[1];
+                    }
+                    groupKey = g ?? "Outros";
+                    if (g == null) groupEn = groupEn ?? "Other";
                 }
                 if (cur.Name == null) cur.Name = Regex.Replace(section, @"\s*\*\s*$", "");
+
+                // O ID usa sempre o texto em português; a exibição segue o idioma escolhido.
+                cur.KeyGroup = cur.Group = groupKey;
+                cur.KeyName = cur.Name;
+                if (L.English)
+                {
+                    if (groupEn != null) cur.Group = groupEn;
+                    if (itemEn != null) cur.Name = itemEn;
+                    if (warningEn != null) cur.Warning = warningEn;
+                }
                 if (cur.Category == null) cur.Category = source;
                 if (cur.FileKeys.Count > 0 || cur.RegKeys.Count > 0 || cur.Special != null) rules.Add(cur);
             };
@@ -131,6 +152,7 @@ namespace OpenCleaner.Core
                     cur = new CleanRule { Source = source };
                     winapp2Section = null;
                     langSec = null;
+                    groupEn = itemEn = warningEn = null;
                     continue;
                 }
                 if (cur == null) continue;
@@ -144,6 +166,9 @@ namespace OpenCleaner.Core
                     case "category": cur.Category = val; break;
                     case "group": cur.Group = val; break;
                     case "item": cur.Name = val; break;
+                    case "groupen": groupEn = val; break;
+                    case "itemen": itemEn = val; break;
+                    case "warningen": warningEn = val; break;
                     case "section": winapp2Section = val; break;
                     case "langsecref": langSec = val; break;
                     case "default": cur.Default = val.Equals("true", StringComparison.OrdinalIgnoreCase); break;
@@ -212,6 +237,7 @@ namespace OpenCleaner.Core
 Category=Navegadores
 Group={N}
 Item=Cache da internet
+ItemEn=Internet cache
 Default=True
 Process={P}
 DetectFile={ROOT}
@@ -228,10 +254,12 @@ FileKey8={ROOT}\GraphiteDawnCache|*.*|RECURSE
 Category=Navegadores
 Group={N}
 Item=Histórico de navegação e downloads
+ItemEn=Browsing and download history
 Default=False
 Process={P}
 DetectFile={ROOT}
 Warning=Remove o histórico de páginas visitadas e de downloads deste navegador.
+WarningEn=Removes the history of visited pages and downloads in this browser.
 FileKey1={PROF}|History;History-journal;Visited Links;Top Sites;Top Sites-journal;Shortcuts;Shortcuts-journal;Network Action Predictor;Network Action Predictor-journal
 
 [{N} - Cookies]
@@ -242,6 +270,7 @@ Default=False
 Process={P}
 DetectFile={ROOT}
 Warning=Você será desconectado de todos os sites neste navegador.
+WarningEn=You will be signed out of every website in this browser.
 FileKey1={PROF}\Network|Cookies;Cookies-journal
 FileKey2={PROF}|Cookies;Cookies-journal
 
@@ -249,6 +278,7 @@ FileKey2={PROF}|Cookies;Cookies-journal
 Category=Navegadores
 Group={N}
 Item=Sessão (abas abertas)
+ItemEn=Session (open tabs)
 Default=False
 Process={P}
 DetectFile={ROOT}
@@ -259,20 +289,24 @@ FileKey2={PROF}|Current Session;Current Tabs;Last Session;Last Tabs
 Category=Navegadores
 Group={N}
 Item=Dados de formulários salvos
+ItemEn=Saved form data
 Default=False
 Process={P}
 DetectFile={ROOT}
 Warning=Remove dados de preenchimento automático, endereços e cartões salvos neste navegador.
+WarningEn=Removes autofill data, addresses and cards saved in this browser.
 FileKey1={PROF}|Web Data;Web Data-journal
 
 [{N} - Senhas]
 Category=Navegadores
 Group={N}
 Item=Senhas salvas
+ItemEn=Saved passwords
 Default=False
 Process={P}
 DetectFile={ROOT}
 Warning=As senhas salvas neste navegador serão apagadas permanentemente (exceto as sincronizadas na sua conta).
+WarningEn=Passwords saved in this browser will be deleted permanently (except those synced to your account).
 FileKey1={PROF}|Login Data;Login Data-journal;Login Data For Account;Login Data For Account-journal
 ";
 
@@ -309,8 +343,10 @@ FileKey1={PROF}|Login Data;Login Data-journal;Login Data For Account;Login Data 
 
             var custom = new CleanRule
             {
-                Category = "Windows", Group = CustomGroup, Name = CustomName, Default = false,
-                Warning = "Todo o conteúdo das pastas configuradas em Opções será apagado."
+                Category = "Windows", KeyGroup = CustomGroup, KeyName = CustomName, IsCustom = true, Default = false,
+                Group = L.T(CustomGroup, "Advanced"), Name = L.T(CustomName, "Custom folders"),
+                Warning = L.T("Todo o conteúdo das pastas configuradas em Opções será apagado.",
+                              "Everything inside the folders set in Options will be deleted.")
             };
             foreach (var f in settings.IncludeFolders)
                 custom.FileKeys.Add(new FileKey { Path = f, Patterns = new[] { "*.*" }, Recurse = true });

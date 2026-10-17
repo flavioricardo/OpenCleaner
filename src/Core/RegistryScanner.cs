@@ -24,7 +24,7 @@ namespace OpenCleaner.Core
             {
                 string s = Util.HiveShort(Hive) + "\\" + KeyPath;
                 if (View == RegistryView.Registry32 && Hive == RegistryHive.LocalMachine && Environment.Is64BitOperatingSystem)
-                    s += " (32 bits)";
+                    s += L.T(" (32 bits)", " (32-bit)");
                 return s;
             }
         }
@@ -56,6 +56,15 @@ namespace OpenCleaner.Core
                 if (Environment.Is64BitOperatingSystem) return new[] { RegistryView.Registry64, RegistryView.Registry32 };
                 return new[] { RegistryView.Default };
             }
+        }
+
+        /// <summary>Nome exibido de uma categoria (a chave em português identifica a categoria nas configurações).</summary>
+        public static string Label(string key)
+        {
+            string[] en = { "Missing shared DLLs", "Program paths", "Programs already removed", "Startup without a file",
+                            "Names of removed programs", "Installer folders", "Missing fonts" };
+            int i = Array.IndexOf(Categories, key);
+            return i < 0 ? key : L.T(key, en[i]);
         }
 
         static IEnumerable<RegistryView> ViewsFor(RegistryHive hive)
@@ -113,7 +122,7 @@ namespace OpenCleaner.Core
                     if (k == null) continue;
                     foreach (var name in k.GetValueNames())
                         if (FileMissing(name))
-                            issues.Add(new RegIssue { Category = Categories[0], Problem = "DLL compartilhada ausente", Data = name,
+                            issues.Add(new RegIssue { Category = Categories[0], Problem = L.T("DLL compartilhada ausente", "Missing shared DLL"), Data = name,
                                                       Hive = RegistryHive.LocalMachine, View = view, KeyPath = p, ValueName = name });
                 }
         }
@@ -132,7 +141,7 @@ namespace OpenCleaner.Core
                                 if (s == null) continue;
                                 string exe = Util.ReadString(s, "");
                                 if (exe != null && FileMissing(exe))
-                                    issues.Add(new RegIssue { Category = Categories[1], Problem = "Caminho de programa inexistente", Data = exe,
+                                    issues.Add(new RegIssue { Category = Categories[1], Problem = L.T("Caminho de programa inexistente", "Program path no longer exists"), Data = exe,
                                                               Hive = hive, View = view, KeyPath = p + "\\" + sub });
                             }
                     }
@@ -160,7 +169,7 @@ namespace OpenCleaner.Core
                                 if (exeName == "msiexec.exe" || exeName == "rundll32.exe") continue;
                                 if (!FileMissing(exe)) continue;
                                 if (!string.IsNullOrWhiteSpace(loc) && !FileMissing(loc)) continue;
-                                issues.Add(new RegIssue { Category = Categories[2], Problem = "Desinstalador não existe mais" + (name != null ? ": " + name : ""),
+                                issues.Add(new RegIssue { Category = Categories[2], Problem = L.T("Desinstalador não existe mais", "Uninstaller no longer exists") + (name != null ? ": " + name : ""),
                                                           Data = exe, Hive = hive, View = view, KeyPath = p + "\\" + sub });
                             }
                     }
@@ -178,7 +187,7 @@ namespace OpenCleaner.Core
                             {
                                 string exe = Util.ExtractExePath(Util.ReadString(k, name));
                                 if (exe != null && FileMissing(exe))
-                                    issues.Add(new RegIssue { Category = Categories[3], Problem = "Inicialização aponta para arquivo inexistente: " + name, Data = exe,
+                                    issues.Add(new RegIssue { Category = Categories[3], Problem = L.T("Inicialização aponta para arquivo inexistente: ", "Startup points to a missing file: ") + name, Data = exe,
                                                               Hive = hive, View = view, KeyPath = p, ValueName = name });
                             }
                         }
@@ -197,7 +206,7 @@ namespace OpenCleaner.Core
                     if (i < 0) continue;
                     string exe = name.Substring(0, i + 4);
                     if (FileMissing(exe))
-                        issues.Add(new RegIssue { Category = Categories[4], Problem = "Nome guardado de programa removido", Data = exe,
+                        issues.Add(new RegIssue { Category = Categories[4], Problem = L.T("Nome guardado de programa removido", "Stored name of a removed program"), Data = exe,
                                                   Hive = RegistryHive.CurrentUser, View = RegistryView.Default, KeyPath = p, ValueName = name });
                 }
             }
@@ -211,7 +220,7 @@ namespace OpenCleaner.Core
                 if (k == null) return;
                 foreach (var name in k.GetValueNames())
                     if (FileMissing(name))
-                        issues.Add(new RegIssue { Category = Categories[5], Problem = "Pasta de instalação inexistente", Data = name,
+                        issues.Add(new RegIssue { Category = Categories[5], Problem = L.T("Pasta de instalação inexistente", "Installation folder no longer exists"), Data = name,
                                                   Hive = RegistryHive.LocalMachine, View = RegistryView.Default, KeyPath = p, ValueName = name });
             }
         }
@@ -233,7 +242,7 @@ namespace OpenCleaner.Core
                             ? FileMissing(file)
                             : !File.Exists(Path.Combine(sysFonts, file)) && !File.Exists(Path.Combine(userFonts, file));
                         if (missing)
-                            issues.Add(new RegIssue { Category = Categories[6], Problem = "Fonte ausente: " + name, Data = file,
+                            issues.Add(new RegIssue { Category = Categories[6], Problem = L.T("Fonte ausente: ", "Missing font: ") + name, Data = file,
                                                       Hive = hive, View = RegistryView.Default, KeyPath = p, ValueName = name });
                     }
                 }

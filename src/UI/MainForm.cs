@@ -26,12 +26,13 @@ namespace OpenCleaner.UI
             get { var v = Assembly.GetExecutingAssembly().GetName().Version; return v.Major + "." + v.Minor + "." + v.Build; }
         }
 
-        public MainForm()
+        public MainForm(string languageOverride = null)
         {
             Settings = AppSettings.Load();
+            L.Init(languageOverride ?? Settings.Language);
             Rules = RuleCatalog.LoadAll(Settings);
 
-            Text = "OpenCleaner" + (Util.IsAdmin() ? " (administrador)" : "");
+            Text = "OpenCleaner" + (Util.IsAdmin() ? L.T(" (administrador)", " (administrator)") : "");
             Font = Theme.Base;
             BackColor = Theme.Nevoa;
             MinimumSize = Theme.Sz(920, 600);
@@ -88,17 +89,17 @@ namespace OpenCleaner.UI
                 items.Controls.Add(l);
             };
 
-            items.Controls.Add(nav("home", "heart-pulse", "Verificação de saúde"));
-            items.Controls.Add(nav("clean", "brush-cleaning", "Limpeza personalizada"));
-            items.Controls.Add(nav("registry", "database", "Registro"));
-            heading("Programas");
-            items.Controls.Add(nav("updates", "refresh-cw", "Atualizar programas"));
-            items.Controls.Add(nav("drivers", "cpu", "Atualizar drivers"));
-            items.Controls.Add(nav("uninstall", "package-minus", "Desinstalar programas"));
-            items.Controls.Add(nav("startup", "power", "Inicialização"));
-            heading("Arquivos");
-            items.Controls.Add(nav("disk", "chart-pie", "Analisador de disco"));
-            items.Controls.Add(nav("dupes", "copy", "Localizador de duplicados"));
+            items.Controls.Add(nav("home", "heart-pulse", L.T("Verificação de saúde", "Health check")));
+            items.Controls.Add(nav("clean", "brush-cleaning", L.T("Limpeza personalizada", "Custom clean")));
+            items.Controls.Add(nav("registry", "database", L.T("Registro", "Registry")));
+            heading(L.T("Programas", "Programs"));
+            items.Controls.Add(nav("updates", "refresh-cw", L.T("Atualizar programas", "Update programs")));
+            items.Controls.Add(nav("drivers", "cpu", L.T("Atualizar drivers", "Update drivers")));
+            items.Controls.Add(nav("uninstall", "package-minus", L.T("Desinstalar programas", "Uninstall programs")));
+            items.Controls.Add(nav("startup", "power", L.T("Inicialização", "Startup")));
+            heading(L.T("Arquivos", "Files"));
+            items.Controls.Add(nav("disk", "chart-pie", L.T("Analisador de disco", "Disk analyzer")));
+            items.Controls.Add(nav("dupes", "copy", L.T("Localizador de duplicados", "Duplicate finder")));
 
             var logo = new Panel { Dock = DockStyle.Top, Height = Theme.S(76), BackColor = Theme.Papel };
             logo.Paint += (s, e) =>
@@ -119,7 +120,7 @@ namespace OpenCleaner.UI
                 Dock = DockStyle.Bottom, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true,
                 Padding = Theme.Pad(12, 8, 12, 14), BackColor = Theme.Papel
             };
-            footer.Controls.Add(nav("options", "settings", "Opções"));
+            footer.Controls.Add(nav("options", "settings", L.T("Opções", "Options")));
             footer.Controls.Add(new ModeChip(this));
             side.Controls.Add(footer);
             return side;
@@ -142,8 +143,8 @@ namespace OpenCleaner.UI
         public bool RequireAdmin(IWin32Window owner, string what)
         {
             if (Util.IsAdmin()) return true;
-            if (MessageBox.Show(owner, what + " precisa de permissão de administrador.\n\nReiniciar o OpenCleaner como administrador?",
-                                "Permissão de administrador", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+            if (MessageBox.Show(owner, what + L.T(" precisa de permissão de administrador.\n\nReiniciar o OpenCleaner como administrador?", " needs administrator permission.\n\nRestart OpenCleaner as administrator?"),
+                                L.T("Permissão de administrador", "Administrator permission"), MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
                 RestartElevated();
             return false;
         }
@@ -177,7 +178,7 @@ namespace OpenCleaner.UI
             lock (detectLock)
             {
                 if (detected == null)
-                    detected = Rules.Where(r => r.Group == RuleCatalog.CustomGroup || r.IsDetected()).ToList();
+                    detected = Rules.Where(r => r.IsCustom || r.IsDetected()).ToList();
                 return detected;
             }
         }
@@ -279,7 +280,7 @@ namespace OpenCleaner.UI
             Margin = Theme.Pad(0, 8, 0, 0);
             TabStop = !admin;
             Cursor = admin ? Cursors.Default : Cursors.Hand;
-            AccessibleName = admin ? "Executando como administrador" : "Reiniciar como administrador";
+            AccessibleName = admin ? L.T("Executando como administrador", "Running as administrator") : L.T("Reiniciar como administrador", "Restart as administrator");
             SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.Selectable, true);
         }
 
@@ -307,8 +308,8 @@ namespace OpenCleaner.UI
             }
             Lucide.Draw(g, admin ? "shield-check" : "shield-check", new RectangleF(Theme.S(12f), Theme.S(9f), Theme.S(16f), Theme.S(16f)),
                         admin ? Theme.Verde : Theme.Grafite);
-            TextRenderer.DrawText(g, admin ? "Administrador" : "Modo padrão", Theme.Bold, new Point(Theme.S(36), Theme.S(8)), Theme.Tinta);
-            TextRenderer.DrawText(g, admin ? "Todas as funções liberadas" : "Reiniciar como administrador", Theme.Small,
+            TextRenderer.DrawText(g, admin ? L.T("Administrador", "Administrator") : L.T("Modo padrão", "Standard mode"), Theme.Bold, new Point(Theme.S(36), Theme.S(8)), Theme.Tinta);
+            TextRenderer.DrawText(g, admin ? L.T("Todas as funções liberadas", "All features available") : L.T("Reiniciar como administrador", "Restart as administrator"), Theme.Small,
                 new Point(Theme.S(36), Theme.S(27)), admin ? Theme.Grafite : Theme.VerdeEscuro);
         }
     }

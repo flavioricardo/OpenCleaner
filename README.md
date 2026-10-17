@@ -47,6 +47,7 @@ vender a versão paga, telemetria ligada por padrão, ofertas de outros produtos
 O OpenCleaner faz o trabalho de um limpador de sistema completo e para por aí:
 
 - **Gratuito de verdade**: nenhum recurso bloqueado, nenhuma assinatura.
+- **Em português e em inglês**: o app e o instalador seguem o idioma do Windows, e dá para trocar a qualquer momento.
 - **Sem telemetria**: o app não envia nada sobre você nem sobre o seu PC.
 - **Transparente**: o código está aqui, e cada item de limpeza mostra exatamente quais arquivos sairão.
 - **Leve**: um único executável de cerca de 230 KB, sem serviço em segundo plano e sem iniciar com o Windows.
@@ -72,7 +73,10 @@ Get-FileHash .\OpenCleaner-Setup.exe -Algorithm SHA256
 ```
 
 **Onde ele fica instalado:** `%LocalAppData%\Programs\OpenCleaner`. Para instalar sem janela (por
-exemplo, em vários PCs), use `OpenCleaner-Setup.exe /S`.
+exemplo, em vários PCs), use `OpenCleaner-Setup.exe /S` (com `/LANG=pt` ou `/LANG=en` para escolher o idioma).
+
+**Idioma:** o instalador abre no idioma do Windows e tem um seletor *Português / English* no canto da
+janela. A escolha vale também para o app e para o desinstalador. Depois, troque em *Opções > Idioma · Language*.
 
 **Desinstalar:** *Configurações > Apps > OpenCleaner > Desinstalar*. O desinstalador pergunta se
 você quer manter suas configurações e os backups do registro.
@@ -196,7 +200,7 @@ consulta o Windows Update (Microsoft). O app não se atualiza sozinho nem inicia
 | Comando | Efeito |
 |---|---|
 | `OpenCleaner.exe /AUTO` | Limpa em segundo plano com os itens marcados, pula programas abertos e grava `auto.log` |
-| `OpenCleaner-Setup.exe /S` | Instala sem janela |
+| `OpenCleaner-Setup.exe /S /LANG=en` | Instala sem janela, em inglês (`/LANG=pt` para português) |
 | `uninstall.exe /uninstall /S` | Desinstala sem janela (o `uninstall.exe` fica na pasta de instalação) |
 
 Para limpar toda semana pelo Agendador de Tarefas:
@@ -328,7 +332,7 @@ Sugestões e correções são bem-vindas em [Issues](https://github.com/flaviori
 ## English
 
 **OpenCleaner** is a free and open-source **PC cleaner for Windows 10 and 11**, a lightweight
-**CCleaner alternative** with **no telemetry, no ads and no paid tier**. The interface is in Brazilian Portuguese.
+**CCleaner alternative** with **no telemetry, no ads and no paid tier**. The app and the installer are available in **English and Brazilian Portuguese**: they follow the Windows language, and you can switch in the installer window or in *Options > Idioma · Language*.
 
 - **Health check** with a disk-space meter showing how much can be reclaimed.
 - **Custom clean**: 70+ built-in rules for Windows temp files, Recycle Bin, logs, crash dumps, thumbnail
@@ -341,6 +345,8 @@ Sugestões e correções são bem-vindas em [Issues](https://github.com/flaviori
 - **Uninstaller**, **startup manager** (same mechanism as Task Manager), **disk analyzer** and **duplicate finder**.
 - **Command line**: `OpenCleaner.exe /AUTO` for silent scheduled cleaning.
 - **Installer** for the current user only, no administrator rights required. A portable zip is also available.
+
+<img src="docs/screenshots/health-check-en.png" width="760" alt="OpenCleaner health check in English, with the disk space meter">
 
 **[Download the installer](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-Setup.exe)** ·
 [portable zip](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-portable.zip) ·

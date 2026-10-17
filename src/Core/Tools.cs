@@ -125,12 +125,12 @@ namespace OpenCleaner.Core
         public static List<StartupEntry> List()
         {
             var list = new List<StartupEntry>();
-            AddRun(list, RegistryHive.CurrentUser, RegistryView.Default, "Run", "Usuário atual");
-            AddRun(list, RegistryHive.LocalMachine, RegistryView.Registry64, "Run", "Todos os usuários");
+            AddRun(list, RegistryHive.CurrentUser, RegistryView.Default, "Run", L.T("Usuário atual", "Current user"));
+            AddRun(list, RegistryHive.LocalMachine, RegistryView.Registry64, "Run", L.T("Todos os usuários", "All users"));
             if (Environment.Is64BitOperatingSystem)
-                AddRun(list, RegistryHive.LocalMachine, RegistryView.Registry32, "Run32", "Todos os usuários (32 bits)");
-            AddFolder(list, Environment.GetFolderPath(Environment.SpecialFolder.Startup), RegistryHive.CurrentUser, "Pasta Inicializar (usuário)");
-            AddFolder(list, Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup), RegistryHive.LocalMachine, "Pasta Inicializar (todos)");
+                AddRun(list, RegistryHive.LocalMachine, RegistryView.Registry32, "Run32", L.T("Todos os usuários (32 bits)", "All users (32-bit)"));
+            AddFolder(list, Environment.GetFolderPath(Environment.SpecialFolder.Startup), RegistryHive.CurrentUser, L.T("Pasta Inicializar (usuário)", "Startup folder (user)"));
+            AddFolder(list, Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup), RegistryHive.LocalMachine, L.T("Pasta Inicializar (todos)", "Startup folder (all users)"));
             return list;
         }
 
@@ -263,19 +263,19 @@ namespace OpenCleaner.Core
         public string CurrentDir;
 
         public static readonly string[] CategoryNames =
-            { "Imagens", "Música", "Vídeos", "Documentos", "Compactados", "E-mails", "Executáveis", "Outros" };
+            { L.T("Imagens", "Images"), L.T("Música", "Music"), L.T("Vídeos", "Videos"), L.T("Documentos", "Documents"), L.T("Compactados", "Archives"), L.T("E-mails", "Email"), L.T("Executáveis", "Executables"), L.T("Outros", "Other") };
 
         static Dictionary<string, string> BuildMap()
         {
             var m = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             Action<string, string> add = (cat, exts) => { foreach (var e in exts.Split(' ')) m["." + e] = cat; };
-            add("Imagens", "jpg jpeg png gif bmp tif tiff webp heic heif raw cr2 nef arw dng psd svg ico");
-            add("Música", "mp3 wav flac aac ogg wma m4a opus aiff mid midi");
-            add("Vídeos", "mp4 mkv avi mov wmv flv webm m4v mpg mpeg 3gp ts vob");
-            add("Documentos", "pdf doc docx xls xlsx ppt pptx odt ods odp txt rtf csv md epub");
-            add("Compactados", "zip rar 7z tar gz bz2 xz iso cab tgz zst");
-            add("E-mails", "pst ost eml msg mbox");
-            add("Executáveis", "exe msi dll sys bat cmd com msix appx");
+            add(L.T("Imagens", "Images"), "jpg jpeg png gif bmp tif tiff webp heic heif raw cr2 nef arw dng psd svg ico");
+            add(L.T("Música", "Music"), "mp3 wav flac aac ogg wma m4a opus aiff mid midi");
+            add(L.T("Vídeos", "Videos"), "mp4 mkv avi mov wmv flv webm m4v mpg mpeg 3gp ts vob");
+            add(L.T("Documentos", "Documents"), "pdf doc docx xls xlsx ppt pptx odt ods odp txt rtf csv md epub");
+            add(L.T("Compactados", "Archives"), "zip rar 7z tar gz bz2 xz iso cab tgz zst");
+            add(L.T("E-mails", "Email"), "pst ost eml msg mbox");
+            add(L.T("Executáveis", "Executables"), "exe msi dll sys bat cmd com msix appx");
             return m;
         }
 
@@ -294,7 +294,7 @@ namespace OpenCleaner.Core
                     foreach (var fi in di.EnumerateFiles())
                     {
                         string cat;
-                        if (!ExtMap.TryGetValue(fi.Extension, out cat)) cat = "Outros";
+                        if (!ExtMap.TryGetValue(fi.Extension, out cat)) cat = L.T("Outros", "Other");
                         var c = result[cat];
                         long len = fi.Length;
                         c.Bytes += len;
@@ -325,7 +325,7 @@ namespace OpenCleaner.Core
 
         public List<List<FileEntry>> Find(string root)
         {
-            Status = "Listando arquivos...";
+            Status = L.T("Listando arquivos...", "Listing files...");
             var bySize = new Dictionary<long, List<FileEntry>>();
             var stack = new Stack<string>();
             stack.Push(root);
@@ -343,7 +343,7 @@ namespace OpenCleaner.Core
                         List<FileEntry> l;
                         if (!bySize.TryGetValue(fi.Length, out l)) bySize[fi.Length] = l = new List<FileEntry>();
                         l.Add(new FileEntry { Path = fi.FullName, Size = fi.Length, Modified = fi.LastWriteTime });
-                        if (++count % 500 == 0) Status = "Listando arquivos... " + count;
+                        if (++count % 500 == 0) Status = L.T("Listando arquivos... ", "Listing files... ") + count;
                     }
                     foreach (var sub in di.EnumerateDirectories())
                     {
@@ -361,7 +361,7 @@ namespace OpenCleaner.Core
             foreach (var sameSize in candidates)
             {
                 if (Cancel) break;
-                Status = "Comparando conteúdo... " + (++done) + "/" + candidates.Count;
+                Status = L.T("Comparando conteúdo... ", "Comparing contents... ") + (++done) + "/" + candidates.Count;
                 IEnumerable<List<FileEntry>> sets = new[] { sameSize };
                 if (MatchName)
                     sets = sameSize.GroupBy(f => Path.GetFileName(f.Path), StringComparer.OrdinalIgnoreCase)

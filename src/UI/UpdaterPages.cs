@@ -39,24 +39,24 @@ namespace OpenCleaner.UI
         bool loaded, busy, wingetMissing;
 
         public SoftwareUpdatePage(MainForm main)
-            : base(main, "Atualizar programas", "Programas com versão nova disponível, instalados pelo Gerenciador de Pacotes do Windows (winget).")
+            : base(main, L.T("Atualizar programas", "Update programs"), L.T("Programas com versão nova disponível, instalados pelo Gerenciador de Pacotes do Windows (winget).", "Programs with a newer version available, installed through Windows Package Manager (winget)."))
         {
-            btnUpdate = AddAction("Atualizar marcados", ButtonKind.Primary, "download", UpdateChecked);
-            btnCheck = AddAction("Procurar atualizações", ButtonKind.Secondary, "refresh-cw", Check);
-            var markAll = Theme.MakeButton("Marcar todos", ButtonKind.Link, "list-checks");
+            btnUpdate = AddAction(L.T("Atualizar marcados", "Update checked"), ButtonKind.Primary, "download", UpdateChecked);
+            btnCheck = AddAction(L.T("Procurar atualizações", "Check for updates"), ButtonKind.Secondary, "refresh-cw", Check);
+            var markAll = Theme.MakeButton(L.T("Marcar todos", "Check all"), ButtonKind.Link, "list-checks");
             markAll.Margin = Theme.Pad(0, 0, 4, 0);
             markAll.Click += (s, e) => SetAll(true);
-            var clear = Theme.MakeButton("Desmarcar todos", ButtonKind.Link, "x");
+            var clear = Theme.MakeButton(L.T("Desmarcar todos", "Uncheck all"), ButtonKind.Link, "x");
             clear.Click += (s, e) => SetAll(false);
             ToolbarLeft.Controls.Add(markAll);
             ToolbarLeft.Controls.Add(clear);
 
             var list = Theme.MakeList(true);
-            Theme.Col(list, "Programa", 280);
-            Theme.Col(list, "Instalada", 120);
-            Theme.Col(list, "Disponível", 120);
-            Theme.Col(list, "ID no winget", 200);
-            Theme.Col(list, "Situação", 200);
+            Theme.Col(list, L.T("Programa", "Program"), 280);
+            Theme.Col(list, L.T("Instalada", "Installed"), 120);
+            Theme.Col(list, L.T("Disponível", "Available"), 120);
+            Theme.Col(list, L.T("ID no winget", "winget ID"), 200);
+            Theme.Col(list, L.T("Situação", "Progress"), 200);
             Theme.EnableSorting(list);
             results = new ListCard(list) { Dock = DockStyle.Fill };
             Body.Controls.Add(results);
@@ -81,7 +81,7 @@ namespace OpenCleaner.UI
             busy = true;
             btnCheck.Enabled = false;
             Reevaluate(btnUpdate);
-            SetStatus("Procurando atualizações...");
+            SetStatus(L.T("Procurando atualizações...", "Looking for updates..."));
             Progress.StartIndeterminate();
             results.List.Items.Clear();
             results.SetEmpty(null);
@@ -100,15 +100,15 @@ namespace OpenCleaner.UI
                 if (!available)
                 {
                     wingetMissing = true;
-                    btnCheck.Text = "Instalar o winget";
-                    SetStatus("O winget não está instalado neste computador.", StatusKind.Warning);
-                    results.SetEmpty("Para atualizar programas, instale o \"Instalador de Aplicativo\" da Microsoft Store\n(botão Instalar o winget, acima) e volte aqui.", "download");
+                    btnCheck.Text = L.T("Instalar o winget", "Install winget");
+                    SetStatus(L.T("O winget não está instalado neste computador.", "winget is not installed on this computer."), StatusKind.Warning);
+                    results.SetEmpty(L.T("Para atualizar programas, instale o \"Instalador de Aplicativo\" da Microsoft Store\n(botão Instalar o winget, acima) e volte aqui.", "To update programs, install \"App Installer\" from the Microsoft Store\n(Install winget button, above) and come back here."), "download");
                     Reevaluate(btnUpdate);
                     return;
                 }
                 if (found == null)
                 {
-                    SetStatus("O winget não respondeu. Tente Procurar atualizações de novo.", StatusKind.Danger);
+                    SetStatus(L.T("O winget não respondeu. Tente Procurar atualizações de novo.", "winget did not respond. Try Check for updates again."), StatusKind.Danger);
                     return;
                 }
                 var list = results.List;
@@ -119,15 +119,15 @@ namespace OpenCleaner.UI
                     it.SubItems.Add(p.Version);
                     it.SubItems.Add(p.Available);
                     Theme.MonoCell(it, p.Id);
-                    it.SubItems.Add(p.Explicit ? "Só atualiza se marcado" : "");
+                    it.SubItems.Add(p.Explicit ? L.T("Só atualiza se marcado", "Updates only when checked") : "");
                     list.Items.Add(it);
                 }
                 Theme.Refit(list);
                 list.EndUpdate();
                 Reevaluate(btnUpdate);
-                if (found.Count == 0) SetStatus("Todos os programas estão atualizados.", StatusKind.Good);
-                else SetStatus(found.Count + " programas têm versão nova. Feche-os antes de atualizar.");
-                results.SetEmpty("Todos os programas conhecidos pelo winget estão na versão mais recente.", "circle-check");
+                if (found.Count == 0) SetStatus(L.T("Todos os programas estão atualizados.", "All programs are up to date."), StatusKind.Good);
+                else SetStatus(found.Count + L.T(" programas têm versão nova. Feche-os antes de atualizar.", " programs have a newer version. Close them before updating."));
+                results.SetEmpty(L.T("Todos os programas conhecidos pelo winget estão na versão mais recente.", "Every program known to winget is on its latest version."), "circle-check");
             });
         }
 
@@ -136,8 +136,8 @@ namespace OpenCleaner.UI
             if (busy) return;
             var items = results.List.CheckedItems.Cast<ListViewItem>().Where(i => i.Tag is PackageUpdate).ToList();
             if (items.Count == 0) return;
-            if (MessageBox.Show(this, "Atualizar " + items.Count + " programa(s)?\n\nFeche esses programas antes. " +
-                                "Alguns instaladores pedem permissão de administrador.", "Atualizar marcados",
+            if (MessageBox.Show(this, L.T("Atualizar ", "Update ") + items.Count + L.T(" programa(s)?\n\nFeche esses programas antes. ", " program(s)?\n\nClose these programs first. ") +
+                                L.T("Alguns instaladores pedem permissão de administrador.", "Some installers ask for administrator permission."), L.T("Atualizar marcados", "Update checked"),
                                 MessageBoxButtons.OKCancel, MessageBoxIcon.Information) != DialogResult.OK) return;
 
             busy = true;
@@ -154,9 +154,9 @@ namespace OpenCleaner.UI
                     int n = index++;
                     Ui(() =>
                     {
-                        SetStatus("Atualizando " + pkg.Name + " (" + (n + 1) + " de " + items.Count + ")...");
+                        SetStatus(L.T("Atualizando ", "Updating ") + pkg.Name + " (" + (n + 1) + L.T(" de ", " of ") + items.Count + ")...");
                         Progress.Value = n;
-                        item.SubItems[StatusCol].Text = "Atualizando...";
+                        item.SubItems[StatusCol].Text = L.T("Atualizando...", "Updating...");
                         item.EnsureVisible();
                     });
                     string message;
@@ -164,7 +164,7 @@ namespace OpenCleaner.UI
                     if (success) ok++; else failed++;
                     Ui(() =>
                     {
-                        item.SubItems[StatusCol].Text = success ? "Atualizado" : "Falhou: " + Short(message);
+                        item.SubItems[StatusCol].Text = success ? L.T("Atualizado", "Updated") : L.T("Falhou: ", "Failed: ") + Short(message);
                         item.ForeColor = success ? Theme.Verde : Theme.Vermelho;
                         if (success) { item.SubItems[1].Text = pkg.Available; item.Checked = false; }
                     });
@@ -175,8 +175,8 @@ namespace OpenCleaner.UI
                 btnCheck.Enabled = true;
                 Progress.Stop();
                 Reevaluate(btnUpdate);
-                if (failed > 0) SetStatus(ok + " atualizado(s) · " + failed + " falharam (veja a coluna Situação)", StatusKind.Danger);
-                else SetStatus(ok + " programa(s) atualizado(s).", StatusKind.Good);
+                if (failed > 0) SetStatus(ok + L.T(" atualizado(s) · ", " updated · ") + failed + L.T(" falharam (veja a coluna Situação)", " failed (see the Progress column)"), StatusKind.Danger);
+                else SetStatus(ok + L.T(" programa(s) atualizado(s).", " program(s) updated."), StatusKind.Good);
             });
         }
 
@@ -197,23 +197,23 @@ namespace OpenCleaner.UI
         bool busy;
 
         public DriverUpdatePage(MainForm main)
-            : base(main, "Atualizar drivers", "Drivers oferecidos pelo Windows Update, certificados e publicados pelos fabricantes.")
+            : base(main, L.T("Atualizar drivers", "Update drivers"), L.T("Drivers oferecidos pelo Windows Update, certificados e publicados pelos fabricantes.", "Drivers offered by Windows Update, certified and published by the manufacturers."))
         {
-            btnInstall = AddAction("Instalar marcados", ButtonKind.Primary, "download", Install);
-            btnSearch = AddAction("Procurar drivers", ButtonKind.Secondary, "search", Search);
-            SetStatus("Nada foi procurado ainda.");
+            btnInstall = AddAction(L.T("Instalar marcados", "Install checked"), ButtonKind.Primary, "download", Install);
+            btnSearch = AddAction(L.T("Procurar drivers", "Search for drivers"), ButtonKind.Secondary, "search", Search);
+            SetStatus(L.T("Nada foi procurado ainda.", "Nothing has been searched yet."));
 
             var list = Theme.MakeList(true);
             Theme.Col(list, "Driver", 340);
-            Theme.Col(list, "Fabricante", 170);
-            Theme.Col(list, "Tipo", 120);
-            Theme.Col(list, "Data", 90);
-            Theme.Col(list, "Tamanho", 90, HorizontalAlignment.Right);
+            Theme.Col(list, L.T("Fabricante", "Manufacturer"), 170);
+            Theme.Col(list, L.T("Tipo", "Type"), 120);
+            Theme.Col(list, L.T("Data", "Date"), 90);
+            Theme.Col(list, L.T("Tamanho", "Size"), 90, HorizontalAlignment.Right);
             Theme.EnableSorting(list);
             results = new ListCard(list) { Dock = DockStyle.Fill };
-            results.SetEmpty("Clique em Procurar drivers. A consulta ao Windows Update leva cerca de um minuto.", "cpu");
+            results.SetEmpty(L.T("Clique em Procurar drivers. A consulta ao Windows Update leva cerca de um minuto.", "Click Search for drivers. Checking Windows Update takes about a minute."), "cpu");
             Body.Controls.Add(results);
-            Body.Controls.Add(new Notice("Em notebooks, o driver de fábrica costuma ser o mais adequado. Antes de instalar, o OpenCleaner cria um ponto de restauração."));
+            Body.Controls.Add(new Notice(L.T("Em notebooks, o driver de fábrica costuma ser o mais adequado. Antes de instalar, o OpenCleaner cria um ponto de restauração.", "On laptops, the factory driver is usually the best fit. Before installing, OpenCleaner creates a restore point.")));
             BindToSelection(btnInstall, list, true, () => !busy);
             Disposed += (s, e) => updater.Dispose();
         }
@@ -229,9 +229,9 @@ namespace OpenCleaner.UI
             Progress.StartIndeterminate();
             var sw = Stopwatch.StartNew();
             var timer = new Timer { Interval = 1000 };
-            timer.Tick += (s, e) => SetStatus("Consultando o Windows Update... " + (int)sw.Elapsed.TotalSeconds + " s");
+            timer.Tick += (s, e) => SetStatus(L.T("Consultando o Windows Update... ", "Checking Windows Update... ") + (int)sw.Elapsed.TotalSeconds + " s");
             timer.Start();
-            SetStatus("Consultando o Windows Update...");
+            SetStatus(L.T("Consultando o Windows Update...", "Checking Windows Update..."));
             updater.Post(() => updater.Search(), (found, error) => Ui(() =>
             {
                 timer.Dispose();
@@ -240,8 +240,8 @@ namespace OpenCleaner.UI
                 btnSearch.Enabled = true;
                 if (error != null)
                 {
-                    SetStatus("O Windows Update não respondeu: " + error.Message, StatusKind.Danger);
-                    results.SetEmpty("Verifique a conexão com a internet e tente Procurar drivers de novo.", "circle-alert");
+                    SetStatus(L.T("O Windows Update não respondeu: ", "Windows Update did not respond: ") + error.Message, StatusKind.Danger);
+                    results.SetEmpty(L.T("Verifique a conexão com a internet e tente Procurar drivers de novo.", "Check your internet connection and try Search for drivers again."), "circle-alert");
                     return;
                 }
                 var list = results.List;
@@ -261,9 +261,9 @@ namespace OpenCleaner.UI
                 Theme.Refit(list);
                 list.EndUpdate();
                 Reevaluate(btnInstall);
-                if (found.Count == 0) SetStatus("Nenhum driver novo no Windows Update.", StatusKind.Good);
-                else SetStatus(found.Count + " driver(s) disponível(is). Marque os que quer instalar.");
-                results.SetEmpty("Os drivers deste computador estão em dia com o Windows Update.", "circle-check");
+                if (found.Count == 0) SetStatus(L.T("Nenhum driver novo no Windows Update.", "No new drivers on Windows Update."), StatusKind.Good);
+                else SetStatus(found.Count + L.T(" driver(s) disponível(is). Marque os que quer instalar.", " driver(s) available. Check the ones you want to install."));
+                results.SetEmpty(L.T("Os drivers deste computador estão em dia com o Windows Update.", "This computer's drivers are up to date with Windows Update."), "circle-check");
             }));
         }
 
@@ -272,28 +272,28 @@ namespace OpenCleaner.UI
             if (busy) return;
             var items = results.List.CheckedItems.Cast<ListViewItem>().Where(i => i.Tag is DriverUpdate).ToList();
             if (items.Count == 0) return;
-            if (!Main.RequireAdmin(this, "Instalar drivers")) return;
-            if (MessageBox.Show(this, "Instalar " + items.Count + " driver(s) do Windows Update?\n\nUm ponto de restauração é criado antes.",
-                                "Instalar marcados", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+            if (!Main.RequireAdmin(this, L.T("Instalar drivers", "Installing drivers"))) return;
+            if (MessageBox.Show(this, L.T("Instalar ", "Install ") + items.Count + L.T(" driver(s) do Windows Update?\n\nUm ponto de restauração é criado antes.", " driver(s) from Windows Update?\n\nA restore point is created first."),
+                                L.T("Instalar marcados", "Install checked"), MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
 
             var drivers = items.Select(i => (DriverUpdate)i.Tag).ToList();
             busy = true;
             btnSearch.Enabled = false;
             Reevaluate(btnInstall);
             Progress.StartIndeterminate();
-            SetStatus("Criando ponto de restauração...");
+            SetStatus(L.T("Criando ponto de restauração...", "Creating a restore point..."));
             string rpError = null;
             bool rpOk = false;
             RunBackground(() => rpOk = DriverUpdater.CreateRestorePoint("OpenCleaner: antes de atualizar drivers", out rpError), () =>
             {
-                if (!rpOk && MessageBox.Show(this, "O ponto de restauração não foi criado (" + rpError + ").\n\nInstalar mesmo assim?",
-                                             "Ponto de restauração", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                if (!rpOk && MessageBox.Show(this, L.T("O ponto de restauração não foi criado (", "The restore point was not created (") + rpError + L.T(").\n\nInstalar mesmo assim?", ").\n\nInstall anyway?"),
+                                             L.T("Ponto de restauração", "Restore point"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
                 {
                     busy = false;
                     btnSearch.Enabled = true;
                     Progress.Stop();
                     Reevaluate(btnInstall);
-                    SetStatus("Instalação cancelada. Nada foi alterado.");
+                    SetStatus(L.T("Instalação cancelada. Nada foi alterado.", "Installation canceled. Nothing was changed."));
                     return;
                 }
                 updater.Post(() => updater.Install(drivers, msg => Ui(() => SetStatus(msg))), (res, error) => Ui(() =>
@@ -304,7 +304,7 @@ namespace OpenCleaner.UI
                     if (error != null)
                     {
                         Reevaluate(btnInstall);
-                        SetStatus("A instalação falhou: " + error.Message, StatusKind.Danger);
+                        SetStatus(L.T("A instalação falhou: ", "Installation failed: ") + error.Message, StatusKind.Danger);
                         return;
                     }
                     foreach (var it in items)
@@ -314,8 +314,8 @@ namespace OpenCleaner.UI
                         it.Checked = false;
                     }
                     Reevaluate(btnInstall);
-                    string text = res.Succeeded + " driver(s) instalado(s)" + (res.Failed > 0 ? " · " + res.Failed + " falharam" : "") +
-                                  (res.RebootRequired ? " · reinicie o computador para concluir" : "");
+                    string text = res.Succeeded + L.T(" driver(s) instalado(s)", " driver(s) installed") + (res.Failed > 0 ? " · " + res.Failed + L.T(" falharam", " failed") : "") +
+                                  (res.RebootRequired ? L.T(" · reinicie o computador para concluir", " · restart the computer to finish") : "");
                     SetStatus(text, res.Failed > 0 ? StatusKind.Danger : res.RebootRequired ? StatusKind.Warning : StatusKind.Good);
                 }));
             });
