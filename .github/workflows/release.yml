@@ -1,0 +1,33 @@
+name: Release
+
+# Ao enviar uma tag vX.Y.Z, compila o instalador e a versão portátil e publica a release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compilar
+        shell: powershell
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          ./installer/build-installer.ps1 -Version $version
+
+      - name: Publicar release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $repo = $env:GITHUB_REPOSITORY
+          $sums = Get-Content dist/SHA256SUMS.txt -Raw
+          $notes = (Get-Content .github/release-notes.md -Raw).Replace('{TAG}', $tag).Replace('{REPO}', $repo).Replace('{SHA256}', $sums.Trim())
+          Set-Content -Path notes.md -Value $notes -Encoding UTF8
+          gh release create $tag dist/OpenCleaner-Setup.exe dist/OpenCleaner-portable.zip dist/SHA256SUMS.txt --title "OpenCleaner $tag" --notes-file notes.md
