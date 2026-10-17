@@ -7,7 +7,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
-using FreeCleaner.Core;
+using OpenCleaner.Core;
 
 static class SmokeTest
 {
@@ -52,7 +52,7 @@ static class SmokeTest
         Console.WriteLine("  total recuperável: " + Util.FormatSize(total) + " (" + sw.ElapsedMilliseconds + " ms)");
 
         Console.WriteLine("== Limpeza real em sandbox ==");
-        string sandbox = Path.Combine(Path.GetTempPath(), "FreeCleanerSmoke_" + Guid.NewGuid().ToString("N"));
+        string sandbox = Path.Combine(Path.GetTempPath(), "OpenCleanerSmoke_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(sandbox, @"Perfil 1\Cache\sub"));
         Directory.CreateDirectory(Path.Combine(sandbox, @"Perfil 2\Cache"));
         Directory.CreateDirectory(Path.Combine(sandbox, @"keep"));
@@ -108,6 +108,65 @@ static class SmokeTest
         Check(Util.ExtractExePath(@"C:\Nao Existe\app.exe -x") == @"C:\Nao Existe\app.exe", "ExtractExePath de exe ausente");
         Check(Util.FormatSize(1536) == "1.5 KB" || Util.FormatSize(1536) == "1,5 KB", "FormatSize");
 
+        Console.WriteLine("== winget ==");
+        string sample =
+            "Nome                          ID                  Versão           Disponível       Origem\r\n" +
+            "--------------------------------------------------------------------------------------------\r\n" +
+            "7-Zip 21.07 (x64)             7zip.7zip           21.07            26.04            winget\r\n" +
+            "Zoom                          Zoom.Zoom.EXE       5.9.1 (2581)     7.2.1 (48556)    winget\r\n" +
+            "2 atualizações disponíveis.\r\n\r\n" +
+            "Os seguintes pacotes têm uma atualização, mas exigem direcionamento explícito:\r\n" +
+            "Name                          Id                  Version          Available        Source\r\n" +
+            "--------------------------------------------------------------------------------------------\r\n" +
+            "Microsoft Edge                Microsoft.Edge      155.0.1          155.0.2          winget\r\n";
+        var parsed = Winget.Parse(sample);
+        Check(parsed.Count == 3, "Parse leu 3 pacotes de 2 tabelas (" + parsed.Count + ")");
+        Check(parsed.Count == 3 && parsed[1].Id == "Zoom.Zoom.EXE" && parsed[1].Version == "5.9.1 (2581)" && parsed[1].Available == "7.2.1 (48556)",
+              "versões com espaço ficam inteiras");
+        Check(parsed.Count == 3 && !parsed[0].Explicit && parsed[2].Explicit, "segunda tabela marcada como atualização manual");
+        string wv;
+        if (Winget.IsAvailable(out wv))
+        {
+            sw.Restart();
+            var ups = Winget.ListUpgrades();
+            Console.WriteLine("  winget " + wv + ": " + ups.Count + " atualizações em " + sw.ElapsedMilliseconds + " ms");
+            foreach (var u in ups.Take(5)) Console.WriteLine("    " + u.Name + " | " + u.Id + " | " + u.Version + " -> " + u.Available);
+            Check(ups.All(u => u.Id.Length > 0 && !u.Id.Contains(" ")), "IDs reais sem espaços");
+        }
+        else Console.WriteLine("  winget indisponível");
+
+        if (args.Contains("--drivers"))
+        {
+            Console.WriteLine("== Drivers (Windows Update, somente busca) ==");
+            using (var du = new DriverUpdater())
+            {
+                var done = new System.Threading.ManualResetEvent(false);
+                sw.Restart();
+                du.Post(() => du.Search(), (list, err) =>
+                {
+                    if (err != null) Console.WriteLine("  erro: " + err.Message);
+                    else foreach (var d in list) Console.WriteLine("    " + d.Title + " | " + d.Manufacturer + " | " + d.DriverClass + " | " + d.Date);
+                    Console.WriteLine("  " + (list == null ? 0 : list.Count) + " drivers em " + sw.Elapsed.TotalSeconds.ToString("0") + " s");
+                    Check(err == null, "busca de drivers via Windows Update Agent");
+                    done.Set();
+                });
+                done.WaitOne(TimeSpan.FromMinutes(10));
+            }
+        }
+
+        Console.WriteLine("== Ícones Lucide ==");
+        var icons = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceNames()
+            .Where(n => n.StartsWith("OpenCleaner.icons.")).Select(n => n.Substring(18, n.Length - 22)).ToList();
+        int blank = 0;
+        foreach (var name in icons)
+            using (var bmp = OpenCleaner.UI.Lucide.Render(name, 24, Color.Black))
+            {
+                int ink = 0;
+                for (int x = 0; x < 24; x++) for (int y = 0; y < 24; y++) if (bmp.GetPixel(x, y).A > 0) ink++;
+                if (ink < 10) { blank++; Console.WriteLine("    vazio: " + name); }
+            }
+        Check(icons.Count >= 20 && blank == 0, icons.Count + " ícones renderizados");
+
         Console.WriteLine("== Registro (somente leitura) ==");
         sw.Restart();
         var issues = new RegistryScanner().Scan(RegistryScanner.Categories);
@@ -125,14 +184,14 @@ static class SmokeTest
 
         Console.WriteLine("== Capturas de tela ==");
         Application.EnableVisualStyles();
-        var form = new FreeCleaner.UI.MainForm();
+        var form = new OpenCleaner.UI.MainForm();
         form.StartPosition = FormStartPosition.Manual;
         form.Location = new Point(-3000, 0);
         form.Show();
-        foreach (var page in new[] { "home", "clean", "registry", "uninstall", "startup", "disk", "dupes", "options" })
+        foreach (var page in new[] { "home", "clean", "registry", "updates", "drivers", "uninstall", "startup", "disk", "dupes", "options" })
         {
             form.Navigate(page);
-            var until = DateTime.Now.AddSeconds(page == "clean" || page == "uninstall" ? 8 : 1.5);
+            var until = DateTime.Now.AddSeconds(page == "updates" ? 25 : page == "clean" || page == "uninstall" ? 8 : 1.5);
             while (DateTime.Now < until) { Application.DoEvents(); System.Threading.Thread.Sleep(30); }
             using (var bmp = new Bitmap(form.Width, form.Height))
             {

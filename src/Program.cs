@@ -4,16 +4,16 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Windows.Forms;
-using FreeCleaner.Core;
+using OpenCleaner.Core;
 
-[assembly: AssemblyTitle("FreeCleaner")]
+[assembly: AssemblyTitle("OpenCleaner")]
 [assembly: AssemblyDescription("Limpador de sistema gratuito e de código aberto")]
-[assembly: AssemblyProduct("FreeCleaner")]
-[assembly: AssemblyCopyright("FreeCleaner")]
+[assembly: AssemblyProduct("OpenCleaner")]
+[assembly: AssemblyCopyright("OpenCleaner")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
 
-namespace FreeCleaner
+namespace OpenCleaner
 {
     static class Program
     {

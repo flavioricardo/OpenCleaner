@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
-namespace FreeCleaner.Core
+namespace OpenCleaner.Core
 {
     class FileKey
     {
@@ -296,7 +296,7 @@ FileKey1={PROF}|Login Data;Login Data-journal;Login Data For Account;Login Data 
         {
             var rules = new List<CleanRule>();
 
-            using (var s = Assembly.GetExecutingAssembly().GetManifestResourceStream("FreeCleaner.rules.builtin.ini"))
+            using (var s = Assembly.GetExecutingAssembly().GetManifestResourceStream("OpenCleaner.rules.builtin.ini"))
             using (var r = new StreamReader(s))
                 rules.AddRange(RuleParser.Parse(r.ReadToEnd(), "builtin"));
 

@@ -4,10 +4,10 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
-using FreeCleaner.Core;
+using OpenCleaner.Core;
 using Microsoft.Win32;
 
-namespace FreeCleaner.UI
+namespace OpenCleaner.UI
 {
     class HomePage : Page
     {
@@ -20,11 +20,11 @@ namespace FreeCleaner.UI
 
         readonly Button btnCheck;
         readonly Label status;
-        readonly Card junk, registry, startup, disk;
+        readonly Card junk, registry, startup, updates, disk;
         List<RuleResult> junkResults;
 
         public HomePage(MainForm main)
-            : base(main, "Verificação de saúde", "Uma verificação rápida de arquivos desnecessários, registro, inicialização e espaço em disco.")
+            : base(main, "Verificação de saúde", "Uma verificação rápida de arquivos desnecessários, registro, inicialização, atualizações e disco.")
         {
             var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
             Body.Controls.Add(flow);
@@ -34,7 +34,7 @@ namespace FreeCleaner.UI
             flow.Resize += (s, e) => sys.Width = Math.Max(400, flow.ClientSize.Width - 8);
 
             var row = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 18, 0, 10), WrapContents = false };
-            btnCheck = Theme.MakeButton("Iniciar verificação", true);
+            btnCheck = Theme.MakeButton("Iniciar verificação", true, "heart-pulse");
             btnCheck.MinimumSize = new Size(200, 44);
             btnCheck.Font = Theme.H2;
             btnCheck.Click += (s, e) => Check();
@@ -44,10 +44,11 @@ namespace FreeCleaner.UI
             flow.Controls.Add(row);
 
             var cards = new FlowLayoutPanel { AutoSize = true, WrapContents = true };
-            junk = MakeCard(cards, "", "Arquivos a limpar", "Limpar agora", CleanJunk);
-            registry = MakeCard(cards, "", "Registro", "Revisar", () => Main.Navigate("registry"));
-            startup = MakeCard(cards, "", "Inicialização", "Gerenciar", () => Main.Navigate("startup"));
-            disk = MakeCard(cards, "", "Espaço em disco", "Analisar", () => Main.Navigate("disk"));
+            junk = MakeCard(cards, "brush-cleaning", "Arquivos a limpar", "Limpar agora", CleanJunk);
+            registry = MakeCard(cards, "database", "Registro", "Revisar", () => Main.Navigate("registry"));
+            startup = MakeCard(cards, "power", "Inicialização", "Gerenciar", () => Main.Navigate("startup"));
+            updates = MakeCard(cards, "refresh-cw", "Atualizações", "Atualizar", () => Main.Navigate("updates"));
+            disk = MakeCard(cards, "hard-drive", "Espaço em disco", "Analisar", () => Main.Navigate("disk"));
             flow.Controls.Add(cards);
             UpdateDiskCard();
         }
@@ -93,13 +94,13 @@ namespace FreeCleaner.UI
             return os + "\n" + cpu + " · " + Environment.ProcessorCount + " núcleos lógicos · " + ram;
         }
 
-        Card MakeCard(Control parent, string glyph, string title, string action, Action onClick)
+        Card MakeCard(Control parent, string iconName, string title, string action, Action onClick)
         {
             var p = Theme.MakeCard();
             p.Size = new Size(200, 180);
             p.Margin = new Padding(0, 0, 14, 14);
-            var icon = new Label { Text = glyph, Font = new Font("Segoe MDL2 Assets", 16f), ForeColor = Theme.Accent, Location = new Point(16, 18), AutoSize = true };
-            var t = new Label { Text = title, Font = Theme.Bold, Location = new Point(48, 20), AutoSize = true };
+            var icon = new IconBox(iconName, 22, Theme.Accent) { Location = new Point(16, 17) };
+            var t = new Label { Text = title, Font = Theme.Bold, Location = new Point(46, 20), AutoSize = true };
             var value = new Label { Text = "—", Font = Theme.Big, Location = new Point(14, 52), AutoSize = true };
             var detail = new Label { Text = "", ForeColor = Theme.Muted, Location = new Point(17, 96), Size = new Size(170, 34) };
             var btn = Theme.MakeButton(action);
@@ -128,11 +129,13 @@ namespace FreeCleaner.UI
         void Check()
         {
             btnCheck.Enabled = false;
-            foreach (var c in new[] { junk, registry, startup }) { c.Value.Text = "..."; c.Detail.Text = ""; c.Action.Visible = false; c.Value.ForeColor = Theme.Text; }
+            foreach (var c in new[] { junk, registry, startup, updates }) { c.Value.Text = "..."; c.Detail.Text = ""; c.Action.Visible = false; c.Value.ForeColor = Theme.Text; }
             var engine = new CleanerEngine(Main.Settings);
             List<RuleResult> results = new List<RuleResult>();
             List<RegIssue> issues = null;
             int startupOn = 0, startupTotal = 0;
+            List<PackageUpdate> outdated = null;
+            string wingetVersion;
 
             RunBackground(() =>
             {
@@ -148,6 +151,12 @@ namespace FreeCleaner.UI
                 var st = Startup.List();
                 startupOn = st.Count(e => e.Enabled);
                 startupTotal = st.Count;
+                if (Winget.IsAvailable(out wingetVersion))
+                {
+                    Ui(() => status.Text = "Procurando atualizações de programas...");
+                    try { outdated = Winget.ListUpgrades(); }
+                    catch { }
+                }
             }, () =>
             {
                 btnCheck.Enabled = true;
@@ -165,6 +174,18 @@ namespace FreeCleaner.UI
                 startup.Detail.Text = "de " + startupTotal + " programas abrem com o Windows";
                 startup.Value.ForeColor = startupOn > 10 ? Theme.Danger : Theme.Text;
                 startup.Action.Visible = startupTotal > 0;
+
+                if (outdated == null)
+                {
+                    updates.Value.Text = "â";
+                    updates.Detail.Text = "winget indisponível";
+                }
+                else
+                {
+                    updates.Value.Text = outdated.Count.ToString();
+                    updates.Detail.Text = outdated.Count == 0 ? "tudo atualizado" : "com versão mais nova disponível";
+                    updates.Action.Visible = outdated.Count > 0;
+                }
 
                 UpdateDiskCard();
                 status.Text = "Verificação concluída. Revise cada item antes de agir.";

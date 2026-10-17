@@ -5,9 +5,9 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
-using FreeCleaner.Core;
+using OpenCleaner.Core;
 
-namespace FreeCleaner.UI
+namespace OpenCleaner.UI
 {
     // ======================= Desinstalar programas =======================
 
@@ -23,21 +23,12 @@ namespace FreeCleaner.UI
         public UninstallPage(MainForm main)
             : base(main, "Desinstalar programas", "Remova programas instalados ou entradas que ficaram para trás.")
         {
-            var side = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 200, FlowDirection = FlowDirection.TopDown, Padding = new Padding(16, 0, 0, 0) };
-            Action<string, bool, Action> button = (text, primary, act) =>
-            {
-                var b = Theme.MakeButton(text, primary);
-                b.AutoSize = false;
-                b.Size = new Size(180, 36);
-                b.Margin = new Padding(0, 0, 0, 8);
-                b.Click += (s, e) => act();
-                side.Controls.Add(b);
-            };
-            button("Desinstalar", true, Uninstall);
-            button("Excluir entrada", false, DeleteEntry);
-            button("Abrir local", false, OpenLocation);
-            button("Atualizar lista", false, Reload);
-            button("Salvar lista...", false, Export);
+            var side = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 220, FlowDirection = FlowDirection.TopDown, Padding = new Padding(16, 0, 0, 0) };
+            SoftwareUpdatePage.SideButton(side, "Desinstalar", true, "trash-2", Uninstall);
+            SoftwareUpdatePage.SideButton(side, "Excluir entrada", false, "x", DeleteEntry);
+            SoftwareUpdatePage.SideButton(side, "Abrir local", false, "folder-open", OpenLocation);
+            SoftwareUpdatePage.SideButton(side, "Atualizar lista", false, "refresh-cw", Reload);
+            SoftwareUpdatePage.SideButton(side, "Salvar lista...", false, "save", Export);
 
             var card = Theme.MakeCard();
             card.Dock = DockStyle.Fill;
@@ -175,7 +166,7 @@ namespace FreeCleaner.UI
                                 "Isto NÃO desinstala o programa; use apenas para entradas de programas que já foram removidos.",
                                 "Excluir entrada", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
             if (Programs.DeleteEntry(p)) { programs.Remove(p); Fill(); }
-            else MessageBox.Show(this, "Sem permissão. Execute o FreeCleaner como administrador.", "Excluir entrada",
+            else MessageBox.Show(this, "Sem permissão. Execute o OpenCleaner como administrador.", "Excluir entrada",
                                  MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
@@ -216,21 +207,12 @@ namespace FreeCleaner.UI
         public StartupPage(MainForm main)
             : base(main, "Inicialização", "Programas que abrem junto com o Windows. Desativar é reversível; excluir não.")
         {
-            var side = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 200, FlowDirection = FlowDirection.TopDown, Padding = new Padding(16, 0, 0, 0) };
-            Action<string, bool, Action> button = (text, primary, act) =>
-            {
-                var b = Theme.MakeButton(text, primary);
-                b.AutoSize = false;
-                b.Size = new Size(180, 36);
-                b.Margin = new Padding(0, 0, 0, 8);
-                b.Click += (s, e) => act();
-                side.Controls.Add(b);
-            };
-            button("Ativar", false, () => SetEnabled(true));
-            button("Desativar", true, () => SetEnabled(false));
-            button("Excluir", false, Delete);
-            button("Abrir local", false, OpenLocation);
-            button("Atualizar lista", false, Reload);
+            var side = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 220, FlowDirection = FlowDirection.TopDown, Padding = new Padding(16, 0, 0, 0) };
+            SoftwareUpdatePage.SideButton(side, "Ativar", false, "toggle-right", () => SetEnabled(true));
+            SoftwareUpdatePage.SideButton(side, "Desativar", true, "toggle-left", () => SetEnabled(false));
+            SoftwareUpdatePage.SideButton(side, "Excluir", false, "trash-2", Delete);
+            SoftwareUpdatePage.SideButton(side, "Abrir local", false, "folder-open", OpenLocation);
+            SoftwareUpdatePage.SideButton(side, "Atualizar lista", false, "refresh-cw", Reload);
 
             var card = Theme.MakeCard();
             card.Dock = DockStyle.Fill;

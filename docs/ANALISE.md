@@ -3,7 +3,7 @@
 Análise feita sobre `C:\Program Files\CCleaner` (versão **6.41.0.11567**), apenas por
 observação: estrutura de arquivos, metadados de versão, arquivos de configuração em texto,
 chaves de registro do próprio usuário e strings legíveis do executável. Nenhum código do
-CCleaner foi descompilado ou copiado; o FreeCleaner é uma implementação própria do mesmo
+CCleaner foi descompilado ou copiado; o OpenCleaner é uma implementação própria do mesmo
 comportamento.
 
 ## Componentes
@@ -48,11 +48,13 @@ software/drivers.
 * **Verificação de saúde** (Health Check): resumo de lixo, privacidade, inicialização e espaço.
 * **Linha de comando** `/AUTO` para limpeza silenciosa.
 
-## O que o FreeCleaner reproduz
+## O que o OpenCleaner reproduz
 
-| Recurso do CCleaner | FreeCleaner |
+| Recurso do CCleaner | OpenCleaner |
 |---|---|
-| Verificação de saúde | ✔ arquivos a limpar, registro, inicialização e disco |
+| Verificação de saúde | ✔ arquivos a limpar, registro, inicialização, atualizações e disco |
+| Atualizador de software | ✔ via **winget** (catálogo oficial da Microsoft, instaladores verificados por hash) em vez do SDK da OPSWAT |
+| Atualizador de drivers | ✔ via **Windows Update Agent** (drivers certificados pelos fabricantes) em vez do backend da Avast, com ponto de restauração antes |
 | Limpeza personalizada (Windows/Aplicativos) | ✔ 76 regras embutidas + suporte a `winapp2.ini` |
 | Detecção de programas instalados | ✔ `Detect`/`DetectFile`, só mostra o que existe |
 | Aviso de navegador aberto / fechar programas | ✔ |
@@ -68,9 +70,9 @@ software/drivers.
 
 ## O que ficou de fora (e por quê)
 
-* **Atualizador de software / drivers e Otimizador de desempenho** — dependem de bancos de dados
-  e serviços na nuvem da Gen Digital/OPSWAT.
-* **Cookies a manter** — exige editar os bancos SQLite dos navegadores; o FreeCleaner apaga
+* **Otimizador de desempenho** — depende de um serviço residente e de perfis de aplicativos na
+  nuvem da Gen Digital.
+* **Cookies a manter** — exige editar os bancos SQLite dos navegadores; o OpenCleaner apaga
   cookies por inteiro e deixa esse item desmarcado por padrão.
 * **Histórico do Firefox** — fica em `places.sqlite` junto com os favoritos; apagar o arquivo
   levaria os favoritos junto.

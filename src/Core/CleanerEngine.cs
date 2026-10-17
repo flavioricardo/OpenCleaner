@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using Microsoft.Win32;
 
-namespace FreeCleaner.Core
+namespace OpenCleaner.Core
 {
     class RuleResult
     {

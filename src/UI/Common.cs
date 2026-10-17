@@ -4,9 +4,9 @@ using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
-using FreeCleaner.Core;
+using OpenCleaner.Core;
 
-namespace FreeCleaner.UI
+namespace OpenCleaner.UI
 {
     static class Theme
     {
@@ -29,9 +29,9 @@ namespace FreeCleaner.UI
         public static readonly Font Title = new Font("Segoe UI Semibold", 17f);
         public static readonly Font H2 = new Font("Segoe UI Semibold", 11.5f);
         public static readonly Font Big = new Font("Segoe UI Light", 22f);
-        public static readonly Font Icons = new Font("Segoe MDL2 Assets", 12f);
 
-        public static Button MakeButton(string text, bool primary = false)
+        /// <summary>Botão padrão; icon é o nome de um ícone Lucide (opcional).</summary>
+        public static Button MakeButton(string text, bool primary = false, string icon = null)
         {
             var b = new Button
             {
@@ -48,6 +48,13 @@ namespace FreeCleaner.UI
             };
             b.FlatAppearance.BorderColor = primary ? Accent : Border;
             b.FlatAppearance.MouseOverBackColor = primary ? AccentHover : Color.FromArgb(236, 240, 244);
+            if (icon != null)
+            {
+                b.Image = Lucide.Render(icon, 16, primary ? Color.White : Text);
+                b.ImageAlign = ContentAlignment.MiddleLeft;
+                b.TextImageRelation = TextImageRelation.ImageBeforeText;
+                b.Padding = new Padding(10, 0, 12, 0);
+            }
             return b;
         }
 
@@ -178,7 +185,7 @@ namespace FreeCleaner.UI
                 Ui(() =>
                 {
                     if (error != null)
-                        MessageBox.Show(this, error.Message, "FreeCleaner", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        MessageBox.Show(this, error.Message, "OpenCleaner", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     done();
                 });
             });

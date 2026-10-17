@@ -4,9 +4,9 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
-using FreeCleaner.Core;
+using OpenCleaner.Core;
 
-namespace FreeCleaner.UI
+namespace OpenCleaner.UI
 {
     // ======================= Analisador de disco =======================
 
@@ -71,15 +71,15 @@ namespace FreeCleaner.UI
                 drives.Items.Add(new DriveItem(d));
             if (drives.Items.Count > 0) drives.SelectedIndex = 0;
             drives.SelectedIndexChanged += (s, e) => customFolder = null;
-            btnFolder = Theme.MakeButton("Escolher pasta...");
+            btnFolder = Theme.MakeButton("Escolher pasta...", false, "folder-open");
             btnFolder.Click += (s, e) =>
             {
                 var f = Prompt.Folder(this, "Pasta a analisar");
                 if (f != null) { customFolder = f; Scan(); }
             };
-            btnScan = Theme.MakeButton("Analisar", true);
+            btnScan = Theme.MakeButton("Analisar", true, "search");
             btnScan.Click += (s, e) => Scan();
-            btnStop = Theme.MakeButton("Parar");
+            btnStop = Theme.MakeButton("Parar", false, "square");
             btnStop.Visible = false;
             btnStop.Click += (s, e) => { if (analyzer != null) analyzer.Cancel = true; };
             status = new Label { AutoSize = true, ForeColor = Theme.Muted, Margin = new Padding(8, 9, 0, 0) };
@@ -221,11 +221,11 @@ namespace FreeCleaner.UI
             Body.Controls.Add(card);
 
             var bar = Theme.MakeButtonBar();
-            var btnDelete = Theme.MakeButton("Mover selecionados para a Lixeira", true);
+            var btnDelete = Theme.MakeButton("Mover selecionados para a Lixeira", true, "trash-2");
             btnDelete.Click += (s, e) => DeleteChecked();
-            var btnSelect = Theme.MakeButton("Selecionar cópias");
+            var btnSelect = Theme.MakeButton("Selecionar cópias", false, "copy");
             btnSelect.Click += (s, e) => SelectCopies();
-            var btnClear = Theme.MakeButton("Limpar seleção");
+            var btnClear = Theme.MakeButton("Limpar seleção", false, "x");
             btnClear.Click += (s, e) => { foreach (ListViewItem it in list.Items) it.Checked = false; };
             bar.Controls.AddRange(new Control[] { btnDelete, btnSelect, btnClear });
             Body.Controls.Add(bar);
@@ -251,9 +251,9 @@ namespace FreeCleaner.UI
             skipHidden = new CheckBox { Text = "Ignorar ocultos/sistema", AutoSize = true, Checked = true, Margin = new Padding(4, 8, 12, 0) };
             top.Controls.Add(matchName);
             top.Controls.Add(skipHidden);
-            btnFind = Theme.MakeButton("Procurar", true);
+            btnFind = Theme.MakeButton("Procurar", true, "search");
             btnFind.Click += (s, e) => Find();
-            btnStop = Theme.MakeButton("Parar");
+            btnStop = Theme.MakeButton("Parar", false, "square");
             btnStop.Visible = false;
             btnStop.Click += (s, e) => { if (finder != null) finder.Cancel = true; };
             browse.Margin = new Padding(0, 5, 8, 0);

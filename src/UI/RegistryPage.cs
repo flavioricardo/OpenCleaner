@@ -4,9 +4,9 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
-using FreeCleaner.Core;
+using OpenCleaner.Core;
 
-namespace FreeCleaner.UI
+namespace OpenCleaner.UI
 {
     class RegistryPage : Page
     {
@@ -41,8 +41,8 @@ namespace FreeCleaner.UI
             right.Controls.Add(status);
 
             var bar = Theme.MakeButtonBar();
-            btnFix = Theme.MakeButton("Corrigir selecionados...", true);
-            btnScan = Theme.MakeButton("Procurar problemas");
+            btnFix = Theme.MakeButton("Corrigir selecionados...", true, "wrench");
+            btnScan = Theme.MakeButton("Procurar problemas", false, "search");
             btnFix.Enabled = false;
             btnFix.Click += (s, e) => Fix();
             btnScan.Click += (s, e) => Scan();

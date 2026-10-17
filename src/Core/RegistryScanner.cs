@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using Microsoft.Win32;
 
-namespace FreeCleaner.Core
+namespace OpenCleaner.Core
 {
     class RegIssue
     {
@@ -248,7 +248,7 @@ namespace FreeCleaner.Core
             var keys = issues.Select(i => new { Path = Util.HiveShort(i.Hive) + "\\" + i.KeyPath, i.View })
                              .Distinct().ToList();
             var sb = new StringBuilder("Windows Registry Editor Version 5.00\r\n");
-            string tmp = Path.Combine(Path.GetTempPath(), "freecleaner_" + Guid.NewGuid().ToString("N") + ".reg");
+            string tmp = Path.Combine(Path.GetTempPath(), "opencleaner_" + Guid.NewGuid().ToString("N") + ".reg");
             try
             {
                 foreach (var k in keys)

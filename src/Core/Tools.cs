@@ -6,7 +6,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using Microsoft.Win32;
 
-namespace FreeCleaner.Core
+namespace OpenCleaner.Core
 {
     // ======================= Programas instalados =======================
 

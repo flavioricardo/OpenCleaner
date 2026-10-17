@@ -4,17 +4,17 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
-namespace FreeCleaner.Core
+namespace OpenCleaner.Core
 {
-    /// <summary>Configurações em %AppData%\FreeCleaner\FreeCleaner.ini.</summary>
+    /// <summary>Configurações em %AppData%\OpenCleaner\OpenCleaner.ini.</summary>
     class AppSettings
     {
         public static string DataDir
         {
-            get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "FreeCleaner"); }
+            get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenCleaner"); }
         }
 
-        public static string FilePath { get { return Path.Combine(DataDir, "FreeCleaner.ini"); } }
+        public static string FilePath { get { return Path.Combine(DataDir, "OpenCleaner.ini"); } }
 
         public Dictionary<string, bool> Rules = new Dictionary<string, bool>();
         public List<string> IncludeFolders = new List<string>();
@@ -40,6 +40,7 @@ namespace FreeCleaner.Core
         public static AppSettings Load()
         {
             var s = new AppSettings();
+            MigrateFromFreeCleaner();
             if (!File.Exists(FilePath)) return s;
             string section = "";
             foreach (var raw in File.ReadAllLines(FilePath, Encoding.UTF8))
@@ -66,6 +67,25 @@ namespace FreeCleaner.Core
                 }
             }
             return s;
+        }
+
+        /// <summary>O app se chamava FreeCleaner: traz configurações, winapp2.ini e backups da pasta antiga.</summary>
+        static void MigrateFromFreeCleaner()
+        {
+            try
+            {
+                string old = Path.Combine(Path.GetDirectoryName(DataDir), "FreeCleaner");
+                if (Directory.Exists(DataDir) || !Directory.Exists(old)) return;
+                foreach (var src in Directory.GetFiles(old, "*", SearchOption.AllDirectories))
+                {
+                    string rel = src.Substring(old.Length + 1);
+                    if (rel.Equals("FreeCleaner.ini", StringComparison.OrdinalIgnoreCase)) rel = "OpenCleaner.ini";
+                    string dst = Path.Combine(DataDir, rel);
+                    Directory.CreateDirectory(Path.GetDirectoryName(dst));
+                    File.Copy(src, dst, false);
+                }
+            }
+            catch { }
         }
 
         public void Save()

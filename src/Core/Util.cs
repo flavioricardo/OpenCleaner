@@ -7,7 +7,7 @@ using System.Security.Principal;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
 
-namespace FreeCleaner.Core
+namespace OpenCleaner.Core
 {
     static class Util
     {

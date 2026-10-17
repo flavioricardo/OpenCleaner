@@ -4,9 +4,9 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
-using FreeCleaner.Core;
+using OpenCleaner.Core;
 
-namespace FreeCleaner.UI
+namespace OpenCleaner.UI
 {
     class OptionsPage : Page
     {
@@ -33,9 +33,9 @@ namespace FreeCleaner.UI
                 Text = File.Exists(RuleCatalog.Winapp2Path) ? "winapp2.ini encontrado em " + AppSettings.DataDir
                                                              : "Coloque um winapp2.ini em " + AppSettings.DataDir
             };
-            var openData = Theme.MakeButton("Abrir pasta");
+            var openData = Theme.MakeButton("Abrir pasta", false, "folder-open");
             openData.Click += (o, e) => { Directory.CreateDirectory(AppSettings.DataDir); Process.Start("explorer.exe", "\"" + AppSettings.DataDir + "\""); };
-            var reload = Theme.MakeButton("Recarregar regras");
+            var reload = Theme.MakeButton("Recarregar regras", false, "refresh-cw");
             reload.Click += (o, e) =>
             {
                 Main.ReloadRules();
@@ -54,7 +54,7 @@ namespace FreeCleaner.UI
             flow.Controls.Add(FolderList(s.ExcludeFolders, false));
 
             flow.Controls.Add(Heading("Linha de comando"));
-            flow.Controls.Add(Hint("FreeCleaner.exe /AUTO   limpa em segundo plano com os itens marcados e grava o resultado em auto.log.\n" +
+            flow.Controls.Add(Hint("OpenCleaner.exe /AUTO   limpa em segundo plano com os itens marcados e grava o resultado em auto.log.\n" +
                                    "Use no Agendador de Tarefas para limpezas automáticas."));
 
             var reset = Theme.MakeButton("Restaurar seleção padrão de itens");

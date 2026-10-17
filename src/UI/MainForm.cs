@@ -5,9 +5,9 @@ using System.Drawing;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
-using FreeCleaner.Core;
+using OpenCleaner.Core;
 
-namespace FreeCleaner.UI
+namespace OpenCleaner.UI
 {
     class MainForm : Form
     {
@@ -31,9 +31,9 @@ namespace FreeCleaner.UI
             Settings = AppSettings.Load();
             Rules = RuleCatalog.LoadAll(Settings);
 
-            Text = "FreeCleaner" + (Util.IsAdmin() ? " (Administrador)" : "");
+            Text = "OpenCleaner" + (Util.IsAdmin() ? " (Administrador)" : "");
             Size = new Size(1180, 760);
-            MinimumSize = new Size(960, 620);
+            MinimumSize = new Size(960, 680);
             StartPosition = FormStartPosition.CenterScreen;
             Font = Theme.Base;
             BackColor = Theme.Background;
@@ -49,6 +49,8 @@ namespace FreeCleaner.UI
                 { "startup", () => new StartupPage(this) },
                 { "disk", () => new DiskPage(this) },
                 { "dupes", () => new DuplicatePage(this) },
+                { "updates", () => new SoftwareUpdatePage(this) },
+                { "drivers", () => new DriverUpdatePage(this) },
                 { "options", () => new OptionsPage(this) },
             };
 
@@ -69,9 +71,9 @@ namespace FreeCleaner.UI
             };
             side.Controls.Add(items);
 
-            Action<string, string, string> nav = (key, glyph, text) =>
+            Action<string, string, string> nav = (key, icon, text) =>
             {
-                var n = new NavItem(key, glyph, text);
+                var n = new NavItem(key, icon, text);
                 n.Click += (s, e) => Navigate(key);
                 navItems.Add(n);
                 items.Controls.Add(n);
@@ -79,32 +81,31 @@ namespace FreeCleaner.UI
             Action<string> heading = text => items.Controls.Add(new Label
             {
                 Text = text, ForeColor = Color.FromArgb(120, 132, 150), Font = new Font("Segoe UI Semibold", 8f),
-                AutoSize = false, Size = new Size(212, 30), TextAlign = ContentAlignment.BottomLeft, Padding = new Padding(8, 0, 0, 4)
+                AutoSize = false, Size = new Size(212, 26), TextAlign = ContentAlignment.BottomLeft, Padding = new Padding(8, 0, 0, 4)
             });
 
-            nav("home", "", "Verificação de saúde");
-            nav("clean", "", "Limpeza personalizada");
-            nav("registry", "", "Registro");
+            nav("home", "heart-pulse", "Verificação de saúde");
+            nav("clean", "brush-cleaning", "Limpeza personalizada");
+            nav("registry", "database", "Registro");
             heading("FERRAMENTAS");
-            nav("uninstall", "", "Desinstalar programas");
-            nav("startup", "", "Inicialização");
-            nav("disk", "", "Analisador de disco");
-            nav("dupes", "", "Localizador de duplicados");
+            nav("updates", "refresh-cw", "Atualizar programas");
+            nav("drivers", "cpu", "Atualizar drivers");
+            nav("uninstall", "package-minus", "Desinstalar programas");
+            nav("startup", "power", "Inicialização");
+            nav("disk", "chart-pie", "Analisador de disco");
+            nav("dupes", "copy", "Localizador de duplicados");
             heading("");
-            nav("options", "", "Opções");
+            nav("options", "settings", "Opções");
 
             var logo = new Panel { Dock = DockStyle.Top, Height = 78, BackColor = Theme.Sidebar };
             logo.Paint += (s, e) =>
             {
                 var g = e.Graphics;
                 g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-                using (var b = new SolidBrush(Theme.Accent)) g.FillEllipse(b, 22, 24, 30, 30);
-                using (var f = new Font("Segoe MDL2 Assets", 13f))
-                    TextRenderer.DrawText(g, "", f, new Rectangle(22, 24, 30, 30), Color.White,
-                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                using (var b = new SolidBrush(Theme.Accent)) g.FillEllipse(b, 20, 22, 34, 34);
+                Lucide.Draw(g, "brush-cleaning", new RectangleF(28, 30, 18, 18), Color.White);
                 using (var f = new Font("Segoe UI Semibold", 15f))
-                    TextRenderer.DrawText(g, "FreeCleaner", f, new Point(60, 25), Color.White);
+                    TextRenderer.DrawText(g, "OpenCleaner", f, new Point(60, 25), Color.White);
             };
             side.Controls.Add(logo);
 
@@ -113,7 +114,10 @@ namespace FreeCleaner.UI
             footer.Controls.Add(ver);
             if (Util.IsAdmin())
             {
-                footer.Controls.Add(new Label { Text = "✔ Executando como administrador", Dock = DockStyle.Top, Height = 24, ForeColor = Theme.SidebarText });
+                var admin = new Panel { Dock = DockStyle.Top, Height = 24 };
+                admin.Controls.Add(new Label { Text = "Executando como administrador", Location = new Point(22, 3), AutoSize = true, ForeColor = Theme.SidebarText });
+                admin.Controls.Add(new IconBox("shield-check", 16, Color.FromArgb(110, 220, 205)) { Location = new Point(0, 3) });
+                footer.Controls.Add(admin);
             }
             else
             {
@@ -129,7 +133,7 @@ namespace FreeCleaner.UI
             return side;
         }
 
-        void RestartElevated()
+        public void RestartElevated()
         {
             try
             {
@@ -189,15 +193,15 @@ namespace FreeCleaner.UI
     class NavItem : Control
     {
         public readonly string Key;
-        readonly string glyph;
+        readonly string icon;
         bool hover, active;
 
-        public NavItem(string key, string glyph, string text)
+        public NavItem(string key, string icon, string text)
         {
             Key = key;
-            this.glyph = glyph;
+            this.icon = icon;
             Text = text;
-            Size = new Size(214, 42);
+            Size = new Size(214, 38);
             Margin = new Padding(0, 1, 0, 1);
             Cursor = Cursors.Hand;
             SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
@@ -219,8 +223,7 @@ namespace FreeCleaner.UI
             if (active)
                 using (var b = new SolidBrush(Theme.Accent)) g.FillRectangle(b, 0, 8, 4, Height - 16);
             var color = active ? Color.White : Theme.SidebarText;
-            TextRenderer.DrawText(g, glyph, Theme.Icons, new Rectangle(14, 0, 24, Height), active ? Color.FromArgb(110, 220, 205) : color,
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            Lucide.Draw(g, icon, new RectangleF(16, (Height - 18) / 2f, 18, 18), active ? Color.FromArgb(110, 220, 205) : color, 1.75f);
             TextRenderer.DrawText(g, Text, active ? Theme.Bold : Theme.Base, new Rectangle(48, 0, Width - 50, Height), color,
                 TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         }

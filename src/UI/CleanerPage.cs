@@ -4,9 +4,9 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-using FreeCleaner.Core;
+using OpenCleaner.Core;
 
-namespace FreeCleaner.UI
+namespace OpenCleaner.UI
 {
     class CleanerPage : Page
     {
@@ -52,9 +52,9 @@ namespace FreeCleaner.UI
             right.Controls.Add(top);
 
             var bar = Theme.MakeButtonBar();
-            btnClean = Theme.MakeButton("Executar limpeza", true);
-            btnAnalyze = Theme.MakeButton("Analisar");
-            btnStop = Theme.MakeButton("Parar");
+            btnClean = Theme.MakeButton("Executar limpeza", true, "brush-cleaning");
+            btnAnalyze = Theme.MakeButton("Analisar", false, "search");
+            btnStop = Theme.MakeButton("Parar", false, "square");
             btnStop.Visible = false;
             btnClean.Click += (s, e) => Run(CheckedRules(), true);
             btnAnalyze.Click += (s, e) => Run(CheckedRules(), false);
