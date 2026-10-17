@@ -1,5 +1,5 @@
-// Gera assets\OpenCleaner.ico: ícone Lucide "brush-cleaning" em branco sobre um círculo
-// verde-azulado, em PNG embutido no ICO (16, 24, 32, 48, 64 e 256 px). Compilado por tools\make-icon.ps1.
+// Gera assets\OpenCleaner.ico: ícone Lucide "brush-cleaning" em branco sobre um quadrado arredondado
+// em Verde-limpo, em PNG embutido no ICO (16, 24, 32, 48, 64 e 256 px). Compilado por tools\make-icon.ps1.
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -18,9 +18,19 @@ static class MakeIcon
             {
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.Clear(Color.Transparent);
+                // Mesma marca da barra lateral: quadrado arredondado em Verde-limpo (#0E7C66).
                 var rect = new RectangleF(0.5f, 0.5f, s - 1, s - 1);
-                using (var b = new LinearGradientBrush(rect, Color.FromArgb(0, 184, 160), Color.FromArgb(0, 105, 140), 45f))
-                    g.FillEllipse(b, rect);
+                float r = s * 0.22f;
+                using (var path = new GraphicsPath())
+                using (var b = new SolidBrush(Color.FromArgb(0x0E, 0x7C, 0x66)))
+                {
+                    path.AddArc(rect.X, rect.Y, 2 * r, 2 * r, 180, 90);
+                    path.AddArc(rect.Right - 2 * r, rect.Y, 2 * r, 2 * r, 270, 90);
+                    path.AddArc(rect.Right - 2 * r, rect.Bottom - 2 * r, 2 * r, 2 * r, 0, 90);
+                    path.AddArc(rect.X, rect.Bottom - 2 * r, 2 * r, 2 * r, 90, 90);
+                    path.CloseFigure();
+                    g.FillPath(b, path);
+                }
                 // Em tamanhos pequenos o traço precisa ser mais grosso para continuar legível.
                 float stroke = s <= 16 ? 2.8f : s <= 32 ? 2.4f : 2f;
                 float pad = s * 0.22f;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -9,62 +10,237 @@ using Microsoft.Win32;
 
 namespace OpenCleaner.UI
 {
+    /// <summary>
+    /// Assinatura visual do OpenCleaner: o disco como uma régua. Ardósia = espaço usado,
+    /// hachurado em Verde-limpo = o que a limpeza pode devolver, trilho vazio = espaço livre.
+    /// Depois da limpeza, o trecho hachurado encolhe e o livre cresce.
+    /// </summary>
+    class SpaceMeter : Control
+    {
+        public long Total;
+        double free, junk = -1;          // valores exibidos (animados)
+        double fromFree, fromJunk, toFree, toJunk;
+        DateTime animStart;
+        readonly Timer timer = new Timer { Interval = 16 };
+        const double AnimMs = 700;
+
+        public SpaceMeter()
+        {
+            Height = Theme.S(70);
+            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+            timer.Tick += (s, e) =>
+            {
+                double t = Math.Min(1, (DateTime.Now - animStart).TotalMilliseconds / AnimMs);
+                double k = 1 - Math.Pow(1 - t, 3); // desacelera no fim
+                free = fromFree + (toFree - fromFree) * k;
+                junk = fromJunk + (toJunk - fromJunk) * k;
+                if (t >= 1) timer.Stop();
+                Invalidate();
+            };
+        }
+
+        /// <summary>junk &lt; 0 = ainda não verificado.</summary>
+        public void Set(long total, long newFree, long newJunk, bool animate)
+        {
+            Total = total;
+            if (!animate || !Theme.Motion || junk < 0)
+            {
+                free = newFree;
+                junk = newJunk;
+                Invalidate();
+                return;
+            }
+            fromFree = free; fromJunk = junk; toFree = newFree; toJunk = newJunk;
+            animStart = DateTime.Now;
+            timer.Start();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.Clear(Parent != null ? Parent.BackColor : Theme.Papel);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            if (Total <= 0) return;
+
+            float h = Theme.S(30f);
+            var track = new RectangleF(0, 0, Width - 1, h);
+            double used = Total - free;
+            double j = Math.Max(0, junk);
+            float wUsed = (float)(track.Width * used / Total);
+            float wJunk = j <= 0 ? 0 : Math.Max(Theme.S(6f), (float)(track.Width * j / Total));
+            wJunk = Math.Min(wJunk, wUsed);
+
+            using (var path = Theme.Rounded(track, Theme.S(8f)))
+            {
+                using (var b = new SolidBrush(Color.FromArgb(0xE3, 0xE7, 0xEC))) g.FillPath(b, path);
+                g.SetClip(path);
+                using (var b = new SolidBrush(Theme.Ardosia)) g.FillRectangle(b, 0, 0, wUsed - wJunk, h);
+                if (wJunk > 0)
+                    using (var hb = new HatchBrush(HatchStyle.WideUpwardDiagonal, Theme.Verde, Theme.VerdeNevoa))
+                        g.FillRectangle(hb, wUsed - wJunk, 0, wJunk, h);
+                g.ResetClip();
+            }
+
+            // Legenda: amostra + rótulo + número
+            float y = h + Theme.S(14f);
+            float x = 0;
+            x = Legend(g, x, y, Brushes.Transparent, Theme.Ardosia, "Usado", Util.FormatSize((long)(used - j)), false);
+            x = Legend(g, x, y, null, Theme.Verde, "Pode ser liberado", junk < 0 ? "verifique para saber" : Util.FormatSize((long)j), true);
+            Legend(g, x, y, null, Color.FromArgb(0xC9, 0xD0, 0xD8), "Livre", Util.FormatSize((long)free), false);
+        }
+
+        float Legend(Graphics g, float x, float y, Brush unused, Color color, string label, string value, bool hatched)
+        {
+            var sw = new RectangleF(x, y + Theme.S(3f), Theme.S(12f), Theme.S(12f));
+            using (var path = Theme.Rounded(sw, Theme.S(3f)))
+            {
+                if (hatched)
+                    using (var hb = new HatchBrush(HatchStyle.WideUpwardDiagonal, color, Theme.VerdeNevoa)) g.FillPath(hb, path);
+                else
+                    using (var b = new SolidBrush(color)) g.FillPath(b, path);
+            }
+            x += Theme.S(18f);
+            var labelSize = TextRenderer.MeasureText(g, label, Theme.Base);
+            TextRenderer.DrawText(g, label, Theme.Base, new Point((int)x, (int)y), Theme.Grafite);
+            x += labelSize.Width;
+            var valueSize = TextRenderer.MeasureText(g, value, Theme.Bold);
+            TextRenderer.DrawText(g, value, Theme.Bold, new Point((int)x, (int)y), Theme.Tinta);
+            return x + valueSize.Width + Theme.S(22f);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) timer.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+
     class HomePage : Page
     {
-        class Card
+        /// <summary>Cartão de resultado: explica o que verifica até haver um número para mostrar.</summary>
+        class ResultCard : Panel
         {
-            public Panel Panel;
-            public Label Value, Detail;
-            public Button Action;
+            readonly Label value, detail, about;
+            readonly Button action;
+
+            public ResultCard(string icon, string title, string description, string actionText, Action onClick)
+            {
+                BackColor = Theme.Papel;
+                Height = Theme.S(168);
+                Margin = Theme.Pad(0, 0, 16, 0);
+                Paint += (s, e) => { using (var p = new Pen(Theme.Linha)) e.Graphics.DrawRectangle(p, 0, 0, Width - 1, Height - 1); };
+                Resize += (s, e) => { Invalidate(); detail.Width = about.Width = Width - Theme.S(40); };
+
+                Controls.Add(new IconBox(icon, Theme.S(20), Theme.Verde) { Location = Theme.Pt(20, 20) });
+                Controls.Add(new Label { Text = title, Font = Theme.H2, Location = Theme.Pt(50, 20), AutoSize = true });
+                about = new Label { Text = description, ForeColor = Theme.Grafite, Location = Theme.Pt(20, 56), Size = Theme.Sz(200, 60) };
+                value = new Label { Font = Theme.Big, Location = Theme.Pt(17, 48), AutoSize = true, Visible = false };
+                detail = new Label { ForeColor = Theme.Grafite, Location = Theme.Pt(20, 96), Size = Theme.Sz(200, 22), Visible = false, AutoEllipsis = true };
+                action = Theme.MakeButton(actionText, ButtonKind.Link);
+                action.Location = Theme.Pt(10, 122);
+                action.Visible = false;
+                action.Click += (s, e) => onClick();
+                Controls.AddRange(new Control[] { about, value, detail, action });
+            }
+
+            public void ShowResult(string number, string text, bool showAction, bool alert = false)
+            {
+                about.Visible = false;
+                value.Text = number;
+                value.ForeColor = alert ? Theme.Ambar : Theme.Tinta;
+                value.Visible = true;
+                detail.Text = text;
+                detail.Visible = true;
+                action.Visible = showAction;
+            }
+
+            public void Busy()
+            {
+                about.Visible = false;
+                value.Text = "…";
+                value.ForeColor = Theme.Grafite;
+                value.Visible = true;
+                detail.Visible = action.Visible = false;
+            }
         }
 
-        readonly Button btnCheck;
-        readonly Label status;
-        readonly Card junk, registry, startup, updates, disk;
+        readonly SpaceMeter meter;
+        readonly Label headline, headlineSub, verdict;
+        readonly Button btnCheck, btnRecheck, btnClean;
+        readonly ResultCard registry, startup, updates;
+        readonly FlowLayoutPanel cards;
         List<RuleResult> junkResults;
+        DriveInfo drive;
+        bool busy;
 
         public HomePage(MainForm main)
-            : base(main, "Verificação de saúde", "Uma verificação rápida de arquivos desnecessários, registro, inicialização, atualizações e disco.")
+            : base(main, "Verificação de saúde", "Quanto espaço dá para recuperar e o que mais merece atenção neste computador.")
         {
-            var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
-            Body.Controls.Add(flow);
+            // ---- Cartão principal: o disco ----
+            var hero = new Panel { Dock = DockStyle.Top, Height = Theme.S(250), BackColor = Theme.Papel, Padding = Theme.Pad(28, 24, 28, 22) };
+            hero.Paint += (s, e) => { using (var p = new Pen(Theme.Linha)) e.Graphics.DrawRectangle(p, 0, 0, hero.Width - 1, hero.Height - 1); };
+            hero.Resize += (s, e) => hero.Invalidate();
 
-            var sys = SystemCard();
-            flow.Controls.Add(sys);
-            flow.Resize += (s, e) => sys.Width = Math.Max(400, flow.ClientSize.Width - 8);
-
-            var row = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 18, 0, 10), WrapContents = false };
-            btnCheck = Theme.MakeButton("Iniciar verificação", true, "heart-pulse");
-            btnCheck.MinimumSize = new Size(200, 44);
-            btnCheck.Font = Theme.H2;
+            var bottomRow = new Panel { Dock = DockStyle.Bottom, Height = Theme.S(40) };
+            verdict = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, ForeColor = Theme.Grafite, AutoEllipsis = true };
+            var actions = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, WrapContents = false };
+            btnCheck = Theme.MakeButton("Verificar agora", ButtonKind.Primary, "heart-pulse");
             btnCheck.Click += (s, e) => Check();
-            status = new Label { AutoSize = true, Margin = new Padding(14, 13, 0, 0), ForeColor = Theme.Muted, Text = "Nada é alterado até você confirmar." };
-            row.Controls.Add(btnCheck);
-            row.Controls.Add(status);
-            flow.Controls.Add(row);
+            btnClean = Theme.MakeButton("Limpar", ButtonKind.Primary, "brush-cleaning");
+            btnClean.Visible = false;
+            btnClean.Click += (s, e) => CleanJunk();
+            // Depois da primeira verificação a ação principal passa a ser Limpar; verificar de novo vira secundária.
+            btnRecheck = Theme.MakeButton("Verificar de novo", ButtonKind.Secondary, "refresh-cw");
+            btnRecheck.Visible = false;
+            btnRecheck.Click += (s, e) => Check();
+            actions.Controls.Add(btnClean);
+            actions.Controls.Add(btnRecheck);
+            actions.Controls.Add(btnCheck);
+            bottomRow.Controls.Add(verdict);
+            bottomRow.Controls.Add(actions);
+            hero.Controls.Add(bottomRow);
 
-            var cards = new FlowLayoutPanel { AutoSize = true, WrapContents = true };
-            junk = MakeCard(cards, "brush-cleaning", "Arquivos a limpar", "Limpar agora", CleanJunk);
-            registry = MakeCard(cards, "database", "Registro", "Revisar", () => Main.Navigate("registry"));
-            startup = MakeCard(cards, "power", "Inicialização", "Gerenciar", () => Main.Navigate("startup"));
-            updates = MakeCard(cards, "refresh-cw", "Atualizações", "Atualizar", () => Main.Navigate("updates"));
-            disk = MakeCard(cards, "hard-drive", "Espaço em disco", "Analisar", () => Main.Navigate("disk"));
-            flow.Controls.Add(cards);
-            UpdateDiskCard();
+            meter = new SpaceMeter { Dock = DockStyle.Top };
+            hero.Controls.Add(meter);
+            hero.Controls.Add(new Panel { Dock = DockStyle.Top, Height = Theme.S(16) });
+
+            var head = new Panel { Dock = DockStyle.Top, Height = Theme.S(78) };
+            var eyebrow = Theme.SectionLabel("Disco do sistema");
+            eyebrow.Location = Theme.Pt(0, 0);
+            headline = new Label { Font = Theme.Big, AutoSize = true, Location = Theme.Pt(-3, 18) };
+            headlineSub = new Label { ForeColor = Theme.Grafite, AutoSize = true };
+            headline.SizeChanged += (s, e) => headlineSub.Location = new Point(headline.Right + Theme.S(6), headline.Top + headline.Height - headlineSub.Height - Theme.S(6));
+            head.Controls.AddRange(new Control[] { eyebrow, headline, headlineSub });
+            hero.Controls.Add(head);
+
+            // ---- Outros resultados ----
+            cards = new FlowLayoutPanel { Dock = DockStyle.Top, Height = Theme.S(168), WrapContents = false };
+            registry = new ResultCard("database", "Registro", "Entradas que apontam para programas e arquivos que não existem mais.",
+                                      "Revisar no Registro", () => Main.Navigate("registry"));
+            startup = new ResultCard("power", "Inicialização", "Programas que abrem junto com o Windows e deixam a entrada mais lenta.",
+                                     "Gerenciar inicialização", () => Main.Navigate("startup"));
+            updates = new ResultCard("refresh-cw", "Atualizações", "Programas instalados que têm versão mais nova disponível.",
+                                     "Atualizar programas", () => Main.Navigate("updates"));
+            updates.Margin = Padding.Empty;
+            cards.Controls.AddRange(new Control[] { registry, startup, updates });
+            cards.Resize += (s, e) =>
+            {
+                int w = (cards.ClientSize.Width - Theme.S(32)) / 3;
+                foreach (Control c in cards.Controls) c.Width = Math.Max(Theme.S(180), w);
+            };
+
+            var system = new Label { Dock = DockStyle.Bottom, Height = Theme.S(26), ForeColor = Theme.Grafite, Font = Theme.Small, Text = SystemSummary(), TextAlign = ContentAlignment.BottomLeft };
+
+            Body.Controls.Add(system);
+            Body.Controls.Add(cards);
+            Body.Controls.Add(new Panel { Dock = DockStyle.Top, Height = Theme.S(16) });
+            Body.Controls.Add(hero);
+
+            UpdateDisk(0, false);
+            verdict.Text = "A verificação só olha: nada é apagado ou alterado até você confirmar.";
         }
 
-        Control SystemCard()
-        {
-            var card = Theme.MakeCard();
-            card.Size = new Size(860, 96);
-            var info = new Label { Location = new Point(18, 14), AutoSize = true, Font = Theme.Base };
-            var title = new Label { Location = new Point(18, 14), AutoSize = true, Font = Theme.H2, Text = Environment.MachineName };
-            info.Location = new Point(18, 40);
-            info.Text = SystemSummary();
-            card.Controls.Add(title);
-            card.Controls.Add(info);
-            return card;
-        }
+        protected override bool ShowStatusRow { get { return false; } }
 
         static string SystemSummary()
         {
@@ -78,60 +254,39 @@ namespace OpenCleaner.UI
                     if (int.TryParse(Util.ReadString(k, "CurrentBuild"), out build) && build >= 22000) os = os.Replace("Windows 10", "Windows 11");
                     string dv = Util.ReadString(k, "DisplayVersion");
                     if (dv != null) os += " " + dv;
-                    os += " (build " + build + ", " + (Environment.Is64BitOperatingSystem ? "64 bits" : "32 bits") + ")";
                 }
                 using (var k = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0"))
-                    cpu = (Util.ReadString(k, "ProcessorNameString") ?? "").Trim();
+                    cpu = System.Text.RegularExpressions.Regex.Replace(Util.ReadString(k, "ProcessorNameString") ?? "", @"\s+", " ").Trim();
             }
             catch { }
             string ram = "";
-            try
-            {
-                var ci = new Microsoft.VisualBasic.Devices.ComputerInfo();
-                ram = Util.FormatSize((long)ci.TotalPhysicalMemory) + " de RAM (" + Util.FormatSize((long)ci.AvailablePhysicalMemory) + " livres)";
-            }
+            try { ram = Util.FormatSize((long)new Microsoft.VisualBasic.Devices.ComputerInfo().TotalPhysicalMemory) + " de RAM"; }
             catch { }
-            return os + "\n" + cpu + " · " + Environment.ProcessorCount + " núcleos lógicos · " + ram;
+            return string.Join("  ·  ", new[] { Environment.MachineName, os, cpu, ram }.Where(s => !string.IsNullOrEmpty(s)));
         }
 
-        Card MakeCard(Control parent, string iconName, string title, string action, Action onClick)
-        {
-            var p = Theme.MakeCard();
-            p.Size = new Size(200, 180);
-            p.Margin = new Padding(0, 0, 14, 14);
-            var icon = new IconBox(iconName, 22, Theme.Accent) { Location = new Point(16, 17) };
-            var t = new Label { Text = title, Font = Theme.Bold, Location = new Point(46, 20), AutoSize = true };
-            var value = new Label { Text = "—", Font = Theme.Big, Location = new Point(14, 52), AutoSize = true };
-            var detail = new Label { Text = "", ForeColor = Theme.Muted, Location = new Point(17, 96), Size = new Size(170, 34) };
-            var btn = Theme.MakeButton(action);
-            btn.Location = new Point(16, 132);
-            btn.Visible = false;
-            btn.Click += (s, e) => onClick();
-            p.Controls.AddRange(new Control[] { icon, t, value, detail, btn });
-            parent.Controls.Add(p);
-            return new Card { Panel = p, Value = value, Detail = detail, Action = btn };
-        }
-
-        void UpdateDiskCard()
+        void UpdateDisk(long junk, bool animate)
         {
             try
             {
-                var d = new DriveInfo(Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.Windows)));
-                double freePct = 100.0 * d.AvailableFreeSpace / d.TotalSize;
-                disk.Value.Text = Util.FormatSize(d.AvailableFreeSpace);
-                disk.Detail.Text = "livres em " + d.Name.TrimEnd('\\') + " (" + freePct.ToString("0") + "% de " + Util.FormatSize(d.TotalSize) + ")";
-                disk.Value.ForeColor = freePct < 10 ? Theme.Danger : Theme.Text;
-                disk.Action.Visible = true;
+                drive = new DriveInfo(Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.Windows)));
+                headline.Text = Util.FormatSize(drive.AvailableFreeSpace) + " livres";
+                headlineSub.Text = "de " + Util.FormatSize(drive.TotalSize) + " no disco " + drive.Name.TrimEnd('\\');
+                headline.ForeColor = drive.AvailableFreeSpace < drive.TotalSize / 10 ? Theme.Ambar : Theme.Tinta;
+                meter.Set(drive.TotalSize, drive.AvailableFreeSpace, junkResults == null && !animate ? -1 : junk, animate);
             }
             catch { }
         }
 
         void Check()
         {
-            btnCheck.Enabled = false;
-            foreach (var c in new[] { junk, registry, startup, updates }) { c.Value.Text = "..."; c.Detail.Text = ""; c.Action.Visible = false; c.Value.ForeColor = Theme.Text; }
+            if (busy) return;
+            busy = true;
+            btnCheck.Enabled = btnRecheck.Enabled = false;
+            btnClean.Visible = false;
+            registry.Busy(); startup.Busy(); updates.Busy();
             var engine = new CleanerEngine(Main.Settings);
-            List<RuleResult> results = new List<RuleResult>();
+            var results = new List<RuleResult>();
             List<RegIssue> issues = null;
             int startupOn = 0, startupTotal = 0;
             List<PackageUpdate> outdated = null;
@@ -142,90 +297,84 @@ namespace OpenCleaner.UI
                 var rules = Main.DetectedRules().Where(r => Main.Settings.IsRuleOn(r)).ToList();
                 foreach (var r in rules)
                 {
-                    Ui(() => status.Text = "Analisando: " + r.FullName);
+                    Ui(() => verdict.Text = "Analisando " + r.FullName + "...");
                     results.Add(engine.Analyze(r));
                 }
-                Ui(() => status.Text = "Verificando o registro...");
-                var cats = RegistryScanner.Categories.Where(c => !Main.Settings.RegistryDisabled.Contains(c));
-                issues = new RegistryScanner().Scan(cats);
+                Ui(() => verdict.Text = "Verificando o registro...");
+                issues = new RegistryScanner().Scan(RegistryScanner.Categories.Where(c => !Main.Settings.RegistryDisabled.Contains(c)));
                 var st = Startup.List();
                 startupOn = st.Count(e => e.Enabled);
                 startupTotal = st.Count;
                 if (Winget.IsAvailable(out wingetVersion))
                 {
-                    Ui(() => status.Text = "Procurando atualizações de programas...");
+                    Ui(() => verdict.Text = "Procurando atualizações de programas...");
                     try { outdated = Winget.ListUpgrades(); }
                     catch { }
                 }
             }, () =>
             {
-                btnCheck.Enabled = true;
+                busy = false;
+                btnCheck.Enabled = btnRecheck.Enabled = true;
+                btnCheck.Visible = false;
+                btnRecheck.Visible = true;
                 junkResults = results.Where(r => r.ItemCount > 0).ToList();
                 long bytes = junkResults.Sum(r => r.Bytes);
-                junk.Value.Text = Util.FormatSize(bytes);
-                junk.Detail.Text = junkResults.Sum(r => r.ItemCount) + " itens em " + junkResults.Count + " categorias";
-                junk.Action.Visible = junkResults.Count > 0;
-
-                registry.Value.Text = issues.Count.ToString();
-                registry.Detail.Text = issues.Count == 0 ? "nenhum problema" : "entradas órfãs encontradas";
-                registry.Action.Visible = issues.Count > 0;
-
-                startup.Value.Text = startupOn.ToString();
-                startup.Detail.Text = "de " + startupTotal + " programas abrem com o Windows";
-                startup.Value.ForeColor = startupOn > 10 ? Theme.Danger : Theme.Text;
-                startup.Action.Visible = startupTotal > 0;
-
-                if (outdated == null)
+                UpdateDisk(bytes, false);
+                if (bytes > 0)
                 {
-                    updates.Value.Text = "â";
-                    updates.Detail.Text = "winget indisponível";
+                    verdict.Text = Util.FormatSize(bytes) + " em " + junkResults.Count + " categorias de arquivos desnecessários (itens marcados na Limpeza personalizada).";
+                    verdict.ForeColor = Theme.Tinta;
+                    btnClean.Text = "Limpar " + Util.FormatSize(bytes);
+                    btnClean.Visible = true;
                 }
                 else
                 {
-                    updates.Value.Text = outdated.Count.ToString();
-                    updates.Detail.Text = outdated.Count == 0 ? "tudo atualizado" : "com versão mais nova disponível";
-                    updates.Action.Visible = outdated.Count > 0;
+                    verdict.Text = "Nenhum arquivo desnecessário nos itens marcados.";
+                    verdict.ForeColor = Theme.Verde;
                 }
 
-                UpdateDiskCard();
-                status.Text = "Verificação concluída. Revise cada item antes de agir.";
+                registry.ShowResult(issues.Count.ToString(), issues.Count == 0 ? "nenhuma entrada órfã" : "entradas órfãs para revisar", issues.Count > 0, issues.Count > 0);
+                startup.ShowResult(startupOn.ToString(), "de " + startupTotal + " programas abrem com o Windows", startupTotal > 0, startupOn > 10);
+                if (outdated == null) updates.ShowResult("—", "winget não instalado", true);
+                else updates.ShowResult(outdated.Count.ToString(), outdated.Count == 0 ? "tudo atualizado" : "com versão nova disponível", outdated.Count > 0, outdated.Count > 0);
             });
         }
 
         void CleanJunk()
         {
-            if (junkResults == null || junkResults.Count == 0) return;
+            if (busy || junkResults == null || junkResults.Count == 0) return;
             var rules = junkResults.Select(r => r.Rule).ToList();
             if (Main.Settings.ConfirmClean &&
-                MessageBox.Show(this, "Remover " + junk.Value.Text + " de arquivos desnecessários?", "Limpar agora",
+                MessageBox.Show(this, "Apagar " + Util.FormatSize(junkResults.Sum(r => r.Bytes)) + " de arquivos desnecessários?", "Limpar",
                                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             rules = CleanFlow.HandleRunningApps(this, rules);
             if (rules == null) return;
 
-            junk.Action.Visible = false;
-            btnCheck.Enabled = false;
+            busy = true;
+            btnClean.Visible = false;
+            btnRecheck.Enabled = false;
             var engine = new CleanerEngine(Main.Settings);
-            long freed = 0;
+            long freed = 0, left = 0;
             int failed = 0;
             RunBackground(() =>
             {
                 foreach (var rule in rules)
                 {
-                    Ui(() => status.Text = "Limpando: " + rule.FullName);
+                    Ui(() => verdict.Text = "Limpando " + rule.FullName + "...");
                     var r = engine.Analyze(rule);
                     engine.Clean(r);
                     freed += r.Freed;
                     failed += r.Failed;
+                    left += Math.Max(0, r.Bytes - r.Freed);
                 }
             }, () =>
             {
-                btnCheck.Enabled = true;
-                junk.Value.Text = Util.FormatSize(freed);
-                junk.Value.ForeColor = Theme.Good;
-                junk.Detail.Text = "liberados" + (failed > 0 ? " · " + failed + " itens em uso ignorados" : "");
+                busy = false;
+                btnRecheck.Enabled = true;
                 junkResults = null;
-                UpdateDiskCard();
-                status.Text = "Limpeza concluída.";
+                UpdateDisk(left, true); // o trecho hachurado encolhe até o que ficou em uso
+                verdict.Text = Util.FormatSize(freed) + " liberados." + (failed > 0 ? " " + failed + " arquivos em uso ficaram para trás." : "");
+                verdict.ForeColor = Theme.Verde;
             });
         }
     }

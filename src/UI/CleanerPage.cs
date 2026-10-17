@@ -11,68 +11,61 @@ namespace OpenCleaner.UI
     class CleanerPage : Page
     {
         static readonly string[] CategoryOrder = { "Windows", "Navegadores", "Aplicativos", "winapp2.ini" };
+        const int Off = 0, On = 1, Mixed = 2;
 
         readonly TreeView tree;
-        readonly ListView results;
-        readonly Label status;
-        readonly ProgressBar progress;
+        readonly ListCard results;
         readonly Button btnAnalyze, btnClean, btnStop;
         CleanerEngine engine;
-        bool updating, busy, treeLoaded;
+        bool busy, treeLoaded;
 
         public CleanerPage(MainForm main)
-            : base(main, "Limpeza personalizada", "Escolha o que limpar, analise para ver o espaço recuperável e execute a limpeza.")
+            : base(main, "Limpeza personalizada", "Escolha o que limpar, analise para ver quanto espaço volta e então execute a limpeza.")
         {
-            // ---- Painel da direita: status + resultados + botões ----
-            var right = new Panel { Dock = DockStyle.Fill, Padding = new Padding(16, 0, 0, 0) };
-            Body.Controls.Add(right);
+            btnClean = AddAction("Executar limpeza", ButtonKind.Primary, "brush-cleaning", () => Run(CheckedRules(), true));
+            btnAnalyze = AddAction("Analisar", ButtonKind.Secondary, "search", () => Run(CheckedRules(), false));
+            btnStop = AddAction("Parar", ButtonKind.Secondary, "square", () => { if (engine != null) engine.Cancel = true; });
+            btnStop.Visible = false;
+            SetStatus("Nada foi analisado ainda.");
 
-            var card = Theme.MakeCard();
-            card.Dock = DockStyle.Fill;
-            right.Controls.Add(card);
-
-            results = Theme.MakeList();
-            results.Columns.Add("Item", 320);
-            results.Columns.Add("Itens", 80, HorizontalAlignment.Right);
-            results.Columns.Add("Tamanho", 100, HorizontalAlignment.Right);
-            results.Columns.Add("Observação", 240);
-            Theme.EnableSorting(results);
-            results.DoubleClick += (s, e) => ShowDetails();
-            var menu = new ContextMenuStrip();
+            // ---- Resultados ----
+            var right = new Panel { Dock = DockStyle.Fill, Padding = Theme.Pad(16, 0, 0, 0) };
+            var list = Theme.MakeList();
+            Theme.Col(list, "Item", 290);
+            Theme.Col(list, "Itens", 70, HorizontalAlignment.Right);
+            Theme.Col(list, "Tamanho", 100, HorizontalAlignment.Right);
+            Theme.Col(list, "Observação", 200);
+            Theme.EnableSorting(list);
+            list.DoubleClick += (s, e) => ShowDetails();
+            var menu = new ContextMenuStrip { Font = Theme.Base };
             menu.Items.Add("Ver arquivos", null, (s, e) => ShowDetails());
             menu.Items.Add("Limpar somente este item", null, (s, e) => CleanSelectedOnly());
-            results.ContextMenuStrip = menu;
-            card.Controls.Add(results);
+            list.ContextMenuStrip = menu;
+            results = new ListCard(list) { Dock = DockStyle.Fill };
+            results.SetEmpty("Marque à esquerda o que deseja limpar e clique em Analisar.\nNada é apagado na análise.", "brush-cleaning");
+            right.Controls.Add(results);
+            Body.Controls.Add(right);
 
-            var top = new Panel { Dock = DockStyle.Top, Height = 64, Padding = new Padding(0, 0, 0, 12) };
-            status = new Label { Dock = DockStyle.Fill, Font = Theme.H2, TextAlign = ContentAlignment.MiddleLeft, Text = "Clique em Analisar para começar." };
-            progress = new ProgressBar { Dock = DockStyle.Bottom, Height = 8, Style = ProgressBarStyle.Continuous };
-            top.Controls.Add(status);
-            top.Controls.Add(progress);
-            right.Controls.Add(top);
-
-            var bar = Theme.MakeButtonBar();
-            btnClean = Theme.MakeButton("Executar limpeza", true, "brush-cleaning");
-            btnAnalyze = Theme.MakeButton("Analisar", false, "search");
-            btnStop = Theme.MakeButton("Parar", false, "square");
-            btnStop.Visible = false;
-            btnClean.Click += (s, e) => Run(CheckedRules(), true);
-            btnAnalyze.Click += (s, e) => Run(CheckedRules(), false);
-            btnStop.Click += (s, e) => { if (engine != null) engine.Cancel = true; };
-            bar.Controls.AddRange(new Control[] { btnClean, btnAnalyze, btnStop });
-            right.Controls.Add(bar);
-
-            // ---- Árvore de regras à esquerda ----
+            // ---- Árvore de itens (três estados: marcado, desmarcado, parcial) ----
             var left = Theme.MakeCard();
             left.Dock = DockStyle.Left;
-            left.Width = 330;
+            left.Width = Theme.S(330);
+            left.Padding = Theme.Pad(1, 6, 1, 1);
             tree = new TreeView
             {
-                Dock = DockStyle.Fill, CheckBoxes = true, BorderStyle = BorderStyle.None, ShowLines = false,
-                ItemHeight = 24, Font = Theme.Base, FullRowSelect = true, HotTracking = false, Indent = 18, ShowNodeToolTips = true
+                Dock = DockStyle.Fill, CheckBoxes = false, BorderStyle = BorderStyle.None, ShowLines = false,
+                ItemHeight = Theme.S(26), Font = Theme.Base, ForeColor = Theme.Tinta, FullRowSelect = true,
+                HotTracking = false, Indent = Theme.S(18), ShowNodeToolTips = true, StateImageList = CheckImages()
             };
-            tree.AfterCheck += Tree_AfterCheck;
-            var tmenu = new ContextMenuStrip();
+            tree.NodeMouseClick += (s, e) =>
+            {
+                if (tree.HitTest(e.Location).Location == TreeViewHitTestLocations.StateImage) Toggle(e.Node);
+            };
+            tree.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Space && tree.SelectedNode != null) { Toggle(tree.SelectedNode); e.Handled = true; }
+            };
+            var tmenu = new ContextMenuStrip { Font = Theme.Base };
             tmenu.Items.Add("Restaurar seleção padrão", null, (s, e) =>
             {
                 foreach (var r in Main.Rules) Main.Settings.Rules.Remove(r.Id);
@@ -86,6 +79,43 @@ namespace OpenCleaner.UI
             Body.Controls.Add(left);
         }
 
+        /// <summary>Caixas de seleção da identidade: borda Grafite claro, marcada em Verde-limpo.</summary>
+        static ImageList CheckImages()
+        {
+            int s = Theme.S(16);
+            var il = new ImageList { ImageSize = new Size(s, s), ColorDepth = ColorDepth.Depth32Bit };
+            for (int state = 0; state < 3; state++)
+            {
+                var bmp = new Bitmap(s, s);
+                using (var g = Graphics.FromImage(bmp))
+                {
+                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    var box = new RectangleF(1.5f, 1.5f, s - 3, s - 3);
+                    using (var path = Theme.Rounded(box, Theme.S(3f)))
+                    {
+                        if (state == Off)
+                        {
+                            using (var b = new SolidBrush(Color.White)) g.FillPath(b, path);
+                            using (var p = new Pen(Color.FromArgb(0x8A, 0x93, 0x9E), Theme.S(1.2f))) g.DrawPath(p, path);
+                        }
+                        else
+                        {
+                            using (var b = new SolidBrush(Theme.Verde)) g.FillPath(b, path);
+                            using (var p = new Pen(Color.White, Theme.S(1.8f)) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round })
+                            {
+                                if (state == On)
+                                    g.DrawLines(p, new[] { new PointF(s * 0.28f, s * 0.52f), new PointF(s * 0.44f, s * 0.68f), new PointF(s * 0.73f, s * 0.36f) });
+                                else
+                                    g.DrawLine(p, s * 0.3f, s * 0.5f, s * 0.7f, s * 0.5f);
+                            }
+                        }
+                    }
+                }
+                il.Images.Add(bmp);
+            }
+            return il;
+        }
+
         public override void Activated()
         {
             if (!treeLoaded) ReloadTree();
@@ -95,14 +125,13 @@ namespace OpenCleaner.UI
         {
             treeLoaded = true;
             tree.Nodes.Clear();
-            tree.Nodes.Add("Carregando regras...");
+            tree.Nodes.Add("Carregando itens...");
             List<CleanRule> rules = null;
             RunBackground(() => rules = Main.DetectedRules(), () => FillTree(rules));
         }
 
         void FillTree(List<CleanRule> rules)
         {
-            updating = true;
             tree.BeginUpdate();
             tree.Nodes.Clear();
             var cats = rules.Select(r => r.Category).Distinct()
@@ -121,67 +150,66 @@ namespace OpenCleaner.UI
                     {
                         var n = gNode.Nodes.Add(r.Name);
                         n.Tag = r;
-                        n.Checked = Main.Settings.IsRuleOn(r);
+                        n.StateImageIndex = Main.Settings.IsRuleOn(r) ? On : Off;
                         if (r.Warning != null) n.ToolTipText = r.Warning;
                     }
-                    gNode.Checked = gNode.Nodes.Cast<TreeNode>().Any(n => n.Checked);
+                    gNode.StateImageIndex = StateOf(gNode);
                     if (cat == "Windows") gNode.Expand();
                 }
-                catNode.Checked = catNode.Nodes.Cast<TreeNode>().Any(n => n.Checked);
+                catNode.StateImageIndex = StateOf(catNode);
                 if (cat != "winapp2.ini") catNode.Expand();
             }
             tree.EndUpdate();
             if (tree.Nodes.Count > 0) tree.Nodes[0].EnsureVisible();
-            updating = false;
         }
 
-        void Tree_AfterCheck(object sender, TreeViewEventArgs e)
+        static int StateOf(TreeNode node)
         {
-            if (updating) return;
-            updating = true;
-            try
+            if (node.Nodes.Count == 0) return node.StateImageIndex == On ? On : Off;
+            bool any = false, all = true;
+            foreach (TreeNode c in node.Nodes)
             {
-                var rule = e.Node.Tag as CleanRule;
-                if (rule != null)
-                {
-                    if (e.Node.Checked && rule.Warning != null &&
-                        MessageBox.Show(this, rule.Warning + "\n\nMarcar este item?", rule.FullName,
-                                        MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-                    {
-                        e.Node.Checked = false;
-                        return;
-                    }
-                    Main.Settings.SetRule(rule, e.Node.Checked);
-                }
-                else
-                {
-                    SetChildren(e.Node, e.Node.Checked);
-                }
-                for (var p = e.Node.Parent; p != null; p = p.Parent)
-                    p.Checked = p.Nodes.Cast<TreeNode>().Any(n => n.Checked);
-                Main.Settings.Save();
+                int st = c.StateImageIndex;
+                if (st != Off) any = true;
+                if (st != On) all = false;
             }
-            finally { updating = false; }
+            return all ? On : any ? Mixed : Off;
         }
 
-        void SetChildren(TreeNode node, bool on)
+        void Toggle(TreeNode node)
+        {
+            if (busy) return;
+            bool on = node.StateImageIndex != On;
+            var rule = node.Tag as CleanRule;
+            if (rule != null)
+            {
+                if (on && rule.Warning != null &&
+                    MessageBox.Show(this, rule.Warning + "\n\nMarcar este item?", rule.FullName,
+                                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                    return;
+                node.StateImageIndex = on ? On : Off;
+                Main.Settings.SetRule(rule, on);
+            }
+            else SetBranch(node, on);
+            for (var p = node.Parent; p != null; p = p.Parent) p.StateImageIndex = StateOf(p);
+            Main.Settings.Save();
+        }
+
+        void SetBranch(TreeNode node, bool on)
         {
             foreach (TreeNode child in node.Nodes)
             {
                 var rule = child.Tag as CleanRule;
                 if (rule != null)
                 {
-                    // Itens com aviso (senhas, cookies...) só são marcados individualmente.
+                    // Itens com aviso (senhas, cookies...) só são marcados um a um.
                     if (on && rule.Warning != null) continue;
-                    child.Checked = on;
+                    child.StateImageIndex = on ? On : Off;
                     Main.Settings.SetRule(rule, on);
                 }
-                else
-                {
-                    SetChildren(child, on);
-                    child.Checked = child.Nodes.Cast<TreeNode>().Any(n => n.Checked);
-                }
+                else SetBranch(child, on);
             }
+            node.StateImageIndex = StateOf(node);
         }
 
         List<CleanRule> CheckedRules()
@@ -193,7 +221,7 @@ namespace OpenCleaner.UI
                 foreach (TreeNode n in nodes)
                 {
                     var r = n.Tag as CleanRule;
-                    if (r != null && n.Checked) list.Add(r);
+                    if (r != null && n.StateImageIndex == On) list.Add(r);
                     walk(n.Nodes);
                 }
             };
@@ -203,25 +231,25 @@ namespace OpenCleaner.UI
 
         void ShowDetails()
         {
-            if (results.SelectedItems.Count == 0) return;
-            var r = results.SelectedItems[0].Tag as RuleResult;
+            if (results.List.SelectedItems.Count == 0) return;
+            var r = results.List.SelectedItems[0].Tag as RuleResult;
             if (r != null)
                 using (var f = new DetailsForm(r)) f.ShowDialog(this);
         }
 
         void CleanSelectedOnly()
         {
-            if (results.SelectedItems.Count == 0) return;
-            var r = results.SelectedItems[0].Tag as RuleResult;
+            if (results.List.SelectedItems.Count == 0) return;
+            var r = results.List.SelectedItems[0].Tag as RuleResult;
             if (r != null) Run(new List<CleanRule> { r.Rule }, true);
         }
 
         void SetBusy(bool on)
         {
             busy = on;
-            btnAnalyze.Enabled = btnClean.Enabled = !on;
-            tree.Enabled = !on;
+            btnAnalyze.Visible = btnClean.Visible = !on;
             btnStop.Visible = on;
+            tree.Enabled = !on;
         }
 
         void Run(List<CleanRule> rules, bool clean)
@@ -229,13 +257,13 @@ namespace OpenCleaner.UI
             if (busy) return;
             if (rules.Count == 0)
             {
-                status.Text = "Nenhum item selecionado.";
+                SetStatus("Marque ao menos um item na lista à esquerda.", StatusKind.Warning);
                 return;
             }
             if (clean)
             {
                 if (Main.Settings.ConfirmClean &&
-                    MessageBox.Show(this, "Os arquivos dos " + rules.Count + " itens selecionados serão removidos permanentemente.\n\nContinuar?",
+                    MessageBox.Show(this, "Os arquivos dos " + rules.Count + " itens marcados serão apagados permanentemente.\n\nExecutar a limpeza?",
                                     "Executar limpeza", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                     return;
                 rules = CleanFlow.HandleRunningApps(this, rules);
@@ -243,11 +271,11 @@ namespace OpenCleaner.UI
             }
 
             SetBusy(true);
-            results.Items.Clear();
-            results.Groups.Clear();
-            status.ForeColor = Theme.Text;
-            progress.Value = 0;
-            progress.Maximum = Math.Max(1, rules.Count);
+            var list = results.List;
+            list.Items.Clear();
+            list.Groups.Clear();
+            results.SetEmpty(null);
+            Progress.Start(rules.Count);
             engine = new CleanerEngine(Main.Settings);
             var eng = engine;
             var all = new List<RuleResult>();
@@ -261,12 +289,12 @@ namespace OpenCleaner.UI
                     int index = i;
                     Ui(() =>
                     {
-                        status.Text = (clean ? "Limpando: " : "Analisando: ") + rule.FullName;
-                        progress.Value = index;
+                        SetStatus((clean ? "Limpando " : "Analisando ") + rule.FullName + "...");
+                        Progress.Value = index;
                     });
                     var res = eng.Analyze(rule);
                     if (rule.Processes.Count > 0 && Util.FindProcesses(rule.Processes).Count > 0 && res.Note == null)
-                        res.Note = "Programa em execução: alguns arquivos podem estar em uso";
+                        res.Note = "Programa aberto: alguns arquivos podem estar em uso";
                     if (clean) eng.Clean(res);
                     all.Add(res);
                     Ui(() => AddRow(res, clean));
@@ -274,42 +302,41 @@ namespace OpenCleaner.UI
             }, () =>
             {
                 SetBusy(false);
-                progress.Value = progress.Maximum;
+                Progress.Stop();
                 string secs = sw.Elapsed.TotalSeconds.ToString("0.0") + " s";
-                string prefix = eng.Cancel ? "Interrompido" : clean ? "Limpeza concluída" : "Análise concluída";
                 if (clean)
                 {
                     long freed = all.Sum(r => r.Freed);
                     int failed = all.Sum(r => r.Failed);
-                    status.Text = prefix + " (" + secs + "): " + Util.FormatSize(freed) + " liberados" +
-                                  (failed > 0 ? " · " + failed + " itens em uso foram ignorados" : "");
-                    status.ForeColor = Theme.Good;
+                    SetStatus((eng.Cancel ? "Limpeza interrompida: " : "Limpeza concluída: ") + Util.FormatSize(freed) + " liberados em " + secs +
+                              (failed > 0 ? " · " + failed + " itens em uso ficaram para trás" : ""), StatusKind.Good);
                 }
                 else
                 {
                     long bytes = all.Sum(r => r.Bytes);
                     int items = all.Sum(r => r.ItemCount);
-                    status.Text = prefix + " (" + secs + "): " + Util.FormatSize(bytes) + " a remover em " + items + " itens";
+                    SetStatus((eng.Cancel ? "Análise interrompida: " : "Análise concluída: ") + Util.FormatSize(bytes) +
+                              " podem ser liberados (" + items + " itens, " + secs + ")");
                 }
-                if (results.Items.Count == 0)
-                    results.Items.Add(new ListViewItem("Nada a limpar nos itens selecionados."));
+                results.SetEmpty(clean ? "Nada restou para limpar nos itens marcados." : "Os itens marcados já estão limpos.", "circle-check");
             });
         }
 
         void AddRow(RuleResult r, bool clean)
         {
             if (r.ItemCount == 0 && r.Failed == 0 && r.Note == null) return;
-            ListViewGroup group = results.Groups.Cast<ListViewGroup>().FirstOrDefault(g => g.Header == r.Rule.Category);
-            if (group == null) group = results.Groups.Add(r.Rule.Category, r.Rule.Category);
+            var list = results.List;
+            ListViewGroup group = list.Groups.Cast<ListViewGroup>().FirstOrDefault(g => g.Header == r.Rule.Category);
+            if (group == null) group = list.Groups.Add(r.Rule.Category, r.Rule.Category);
             var it = new ListViewItem(r.Rule.FullName, group) { Tag = r };
             var count = clean ? r.Removed : r.ItemCount;
-            it.SubItems.Add(new ListViewItem.ListViewSubItem(it, count.ToString()) { Tag = (long)count });
+            it.SubItems.Add(new ListViewItem.ListViewSubItem(it, count.ToString("N0")) { Tag = (long)count });
             Theme.SizeCell(it, clean ? r.Freed : r.Bytes);
             string note = r.Note ?? "";
             if (clean && r.Failed > 0) note = r.Failed + " em uso ou sem permissão" + (note.Length > 0 ? " · " + note : "");
             it.SubItems.Add(note);
-            if (r.Failed > 0 || r.Note != null) it.ForeColor = Color.FromArgb(150, 90, 0);
-            results.Items.Add(it);
+            if (r.Failed > 0 || r.Note != null) it.ForeColor = Theme.Ambar;
+            list.Items.Add(it);
         }
     }
 }

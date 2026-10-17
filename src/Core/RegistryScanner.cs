@@ -39,10 +39,10 @@ namespace OpenCleaner.Core
         public static readonly string[] Categories =
         {
             "DLLs compartilhadas ausentes",
-            "Caminhos de aplicativos",
-            "Programas desinstalados",
-            "Inicialização com arquivo ausente",
-            "Cache MUI",
+            "Caminhos de programas",
+            "Programas já removidos",
+            "Inicialização sem arquivo",
+            "Nomes de programas removidos",
             "Pastas de instaladores",
             "Fontes ausentes"
         };
@@ -132,7 +132,7 @@ namespace OpenCleaner.Core
                                 if (s == null) continue;
                                 string exe = Util.ReadString(s, "");
                                 if (exe != null && FileMissing(exe))
-                                    issues.Add(new RegIssue { Category = Categories[1], Problem = "Caminho de aplicativo inválido", Data = exe,
+                                    issues.Add(new RegIssue { Category = Categories[1], Problem = "Caminho de programa inexistente", Data = exe,
                                                               Hive = hive, View = view, KeyPath = p + "\\" + sub });
                             }
                     }
@@ -160,7 +160,7 @@ namespace OpenCleaner.Core
                                 if (exeName == "msiexec.exe" || exeName == "rundll32.exe") continue;
                                 if (!FileMissing(exe)) continue;
                                 if (!string.IsNullOrWhiteSpace(loc) && !FileMissing(loc)) continue;
-                                issues.Add(new RegIssue { Category = Categories[2], Problem = "Desinstalador ausente" + (name != null ? ": " + name : ""),
+                                issues.Add(new RegIssue { Category = Categories[2], Problem = "Desinstalador não existe mais" + (name != null ? ": " + name : ""),
                                                           Data = exe, Hive = hive, View = view, KeyPath = p + "\\" + sub });
                             }
                     }
@@ -178,7 +178,7 @@ namespace OpenCleaner.Core
                             {
                                 string exe = Util.ExtractExePath(Util.ReadString(k, name));
                                 if (exe != null && FileMissing(exe))
-                                    issues.Add(new RegIssue { Category = Categories[3], Problem = "Programa de inicialização ausente: " + name, Data = exe,
+                                    issues.Add(new RegIssue { Category = Categories[3], Problem = "Inicialização aponta para arquivo inexistente: " + name, Data = exe,
                                                               Hive = hive, View = view, KeyPath = p, ValueName = name });
                             }
                         }
@@ -197,7 +197,7 @@ namespace OpenCleaner.Core
                     if (i < 0) continue;
                     string exe = name.Substring(0, i + 4);
                     if (FileMissing(exe))
-                        issues.Add(new RegIssue { Category = Categories[4], Problem = "Referência a programa removido", Data = exe,
+                        issues.Add(new RegIssue { Category = Categories[4], Problem = "Nome guardado de programa removido", Data = exe,
                                                   Hive = RegistryHive.CurrentUser, View = RegistryView.Default, KeyPath = p, ValueName = name });
                 }
             }
@@ -211,7 +211,7 @@ namespace OpenCleaner.Core
                 if (k == null) return;
                 foreach (var name in k.GetValueNames())
                     if (FileMissing(name))
-                        issues.Add(new RegIssue { Category = Categories[5], Problem = "Pasta de instalador inexistente", Data = name,
+                        issues.Add(new RegIssue { Category = Categories[5], Problem = "Pasta de instalação inexistente", Data = name,
                                                   Hive = RegistryHive.LocalMachine, View = RegistryView.Default, KeyPath = p, ValueName = name });
             }
         }

@@ -64,6 +64,23 @@ tools/        gerador do ícone do app
 * Duplicados e arquivos do analisador de disco vão para a Lixeira.
 * Drivers vêm desmarcados; atualizações só de fontes oficiais (winget e Windows Update).
 
+## Identidade visual
+
+| Token | Cor | Uso |
+|---|---|---|
+| Névoa | `#EEF1F4` | fundo das páginas |
+| Papel | `#FFFFFF` | barra lateral, cartões e listas |
+| Tinta | `#1B1F24` | texto |
+| Grafite | `#5B636E` | texto secundário (5,4:1 sobre Névoa) |
+| Verde-limpo | `#0E7C66` | ação principal e seleção (5,1:1 com branco) |
+| Ardósia | `#3A414B` | espaço usado no medidor |
+| Âmbar | `#8A5A12` sobre `#FFF4DC` | avisos |
+
+Tipos: **Bahnschrift** (títulos e números), **Segoe UI** (texto), **Consolas** (caminhos, chaves e IDs), todos
+incluídos no Windows. Elemento de assinatura: o **medidor de espaço** da Verificação de saúde, com o trecho
+hachurado do que a limpeza pode devolver. Cada página segue o mesmo modelo: título, barra de ações (ação
+principal na ponta direita), linha de status e conteúdo com estado vazio explicativo.
+
 ## Créditos
 
 Ícones: [Lucide](https://lucide.dev) v1.58.0, licença ISC — ver `assets/icons/LICENSE`.

@@ -13,6 +13,30 @@ static class SmokeTest
 {
     static int failures;
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    static IEnumerable<ListView> AllLists(Control root)
+    {
+        foreach (Control c in root.Controls)
+        {
+            if (c is ListView) yield return (ListView)c;
+            foreach (var l in AllLists(c)) yield return l;
+        }
+    }
+
+    static Button FindButton(Control root, string text)
+    {
+        foreach (Control c in root.Controls)
+        {
+            var b = c as Button;
+            if (b != null && b.Text == text && b.Visible && c.Parent != null && c.Parent.Visible) return b;
+            var found = FindButton(c, text);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
     static void Check(bool cond, string what)
     {
         Console.WriteLine((cond ? "  [ok]   " : "  [FALHA] ") + what);
@@ -188,19 +212,58 @@ static class SmokeTest
         form.StartPosition = FormStartPosition.Manual;
         form.Location = new Point(-3000, 0);
         form.Show();
-        foreach (var page in new[] { "home", "clean", "registry", "updates", "drivers", "uninstall", "startup", "disk", "dupes", "options" })
+        Action<double> pump = secs =>
         {
-            form.Navigate(page);
-            var until = DateTime.Now.AddSeconds(page == "updates" ? 25 : page == "clean" || page == "uninstall" ? 8 : 1.5);
+            var until = DateTime.Now.AddSeconds(secs);
             while (DateTime.Now < until) { Application.DoEvents(); System.Threading.Thread.Sleep(30); }
+        };
+        Func<Func<bool>, double, bool> waitFor = (cond, secs) =>
+        {
+            var until = DateTime.Now.AddSeconds(secs);
+            while (DateTime.Now < until) { if (cond()) return true; Application.DoEvents(); System.Threading.Thread.Sleep(50); }
+            return false;
+        };
+        Action<string> shot = name =>
+        {
             using (var bmp = new Bitmap(form.Width, form.Height))
             {
                 form.DrawToBitmap(bmp, new Rectangle(0, 0, form.Width, form.Height));
-                string file = Path.Combine(outDir, "shot-" + page + ".png");
+                string file = Path.Combine(outDir, "shot-" + name + ".png");
                 bmp.Save(file);
                 Console.WriteLine("  " + file);
             }
+        };
+        Check(form.Height <= Screen.PrimaryScreen.WorkingArea.Height, "janela cabe na área útil da tela");
+
+        foreach (var page in new[] { "home", "clean", "registry", "updates", "drivers", "uninstall", "startup", "disk", "dupes", "options" })
+        {
+            form.Navigate(page);
+            pump(page == "updates" ? 25 : page == "clean" || page == "uninstall" ? 6 : 1.5);
+            shot(page);
+            foreach (var lv in AllLists(form).Where(l => l.Visible && l.Items.Count > 0))
+            {
+                int cols = lv.Columns.Cast<ColumnHeader>().Sum(c => c.Width);
+                bool hs = (GetWindowLong(lv.Handle, -16) & 0x00100000) != 0;
+                Check(!hs, page + ": lista sem rolagem horizontal (colunas " + cols + " / área " + lv.ClientSize.Width + ")");
+            }
         }
+
+        // Estados com resultado (só leitura: verificar, analisar e procurar não alteram nada).
+        Action<string, string, string, double> run = (page, button, doneText, secs) =>
+        {
+            form.Navigate(page);
+            pump(1);
+            var b = FindButton(form, button);
+            if (b == null) { Check(false, "botão \"" + button + "\" em " + page); return; }
+            b.PerformClick();
+            bool done = waitFor(() => doneText == null ? b.Visible && b.Enabled : FindButton(form, doneText) != null, secs);
+            pump(1);
+            Check(done, page + ": \"" + button + "\" terminou");
+            shot(page + "-result");
+        };
+        run("home", "Verificar agora", "Verificar de novo", 120);
+        run("clean", "Analisar", null, 120);
+        run("registry", "Procurar problemas", null, 60);
         form.Close();
 
         Console.WriteLine(failures == 0 ? "\nTUDO OK" : "\n" + failures + " FALHA(S)");

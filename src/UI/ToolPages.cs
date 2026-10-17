@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using Microsoft.Win32;
 using OpenCleaner.Core;
 
 namespace OpenCleaner.UI
@@ -13,47 +14,42 @@ namespace OpenCleaner.UI
 
     class UninstallPage : Page
     {
-        readonly ListView list;
+        readonly ListCard results;
         readonly TextBox search;
-        readonly Label status;
-        readonly ImageList icons = new ImageList { ImageSize = new Size(20, 20), ColorDepth = ColorDepth.Depth32Bit };
+        readonly Button btnUninstall, btnOpen;
+        readonly ImageList icons;
         List<InstalledProgram> programs = new List<InstalledProgram>();
         bool loaded;
 
         public UninstallPage(MainForm main)
-            : base(main, "Desinstalar programas", "Remova programas instalados ou entradas que ficaram para trás.")
+            : base(main, "Desinstalar programas", "Remova programas instalados ou entradas de programas que já não existem.")
         {
-            var side = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 220, FlowDirection = FlowDirection.TopDown, Padding = new Padding(16, 0, 0, 0) };
-            SoftwareUpdatePage.SideButton(side, "Desinstalar", true, "trash-2", Uninstall);
-            SoftwareUpdatePage.SideButton(side, "Excluir entrada", false, "x", DeleteEntry);
-            SoftwareUpdatePage.SideButton(side, "Abrir local", false, "folder-open", OpenLocation);
-            SoftwareUpdatePage.SideButton(side, "Atualizar lista", false, "refresh-cw", Reload);
-            SoftwareUpdatePage.SideButton(side, "Salvar lista...", false, "save", Export);
+            btnUninstall = AddAction("Desinstalar", ButtonKind.Primary, "trash-2", Uninstall);
+            btnOpen = AddAction("Abrir local", ButtonKind.Secondary, "folder-open", OpenLocation);
+            ToolbarRight.Controls.Add(Theme.MakeMenuButton("Mais",
+                Theme.Item("Remover da lista...", RemoveEntry),
+                Theme.Item("Atualizar lista", Reload),
+                Theme.Item("Salvar lista como texto...", Export)));
 
-            var card = Theme.MakeCard();
-            card.Dock = DockStyle.Fill;
-            list = Theme.MakeList();
+            search = new TextBox { Width = Theme.S(300), Font = Theme.Base, Margin = Theme.Pad(0, 5, 0, 0) };
+            SetCue(search, "Pesquisar por nome ou desenvolvedor");
+            search.TextChanged += (s, e) => Fill();
+            ToolbarLeft.Controls.Add(search);
+
+            var list = Theme.MakeList();
+            icons = new ImageList { ImageSize = Theme.Sz(24, 24), ColorDepth = ColorDepth.Depth32Bit };
             list.SmallImageList = icons;
-            list.Columns.Add("Programa", 340);
-            list.Columns.Add("Editor", 200);
-            list.Columns.Add("Instalado em", 100);
-            list.Columns.Add("Tamanho", 90, HorizontalAlignment.Right);
-            list.Columns.Add("Versão", 130);
+            Theme.Col(list, "Programa", 330);
+            Theme.Col(list, "Desenvolvedor", 200);
+            Theme.Col(list, "Instalado em", 100);
+            Theme.Col(list, "Tamanho", 90, HorizontalAlignment.Right);
+            Theme.Col(list, "Versão", 120);
             Theme.EnableSorting(list);
             list.DoubleClick += (s, e) => Uninstall();
-            card.Controls.Add(list);
-
-            Body.Controls.Add(card);
-            Body.Controls.Add(side);
-
-            var top = new Panel { Dock = DockStyle.Top, Height = 44 };
-            search = new TextBox { Width = 320, Location = new Point(0, 6), Font = Theme.Base };
-            SetCue(search, "Pesquisar programas...");
-            search.TextChanged += (s, e) => Fill();
-            status = new Label { AutoSize = true, Location = new Point(336, 10), ForeColor = Theme.Muted };
-            top.Controls.Add(search);
-            top.Controls.Add(status);
-            Body.Controls.Add(top);
+            results = new ListCard(list) { Dock = DockStyle.Fill };
+            Body.Controls.Add(results);
+            BindToSelection(btnUninstall, list);
+            BindToSelection(btnOpen, list);
         }
 
         [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
@@ -72,7 +68,8 @@ namespace OpenCleaner.UI
         void Reload()
         {
             loaded = true;
-            status.Text = "Carregando...";
+            SetStatus("Lendo a lista de programas...");
+            Progress.StartIndeterminate();
             List<InstalledProgram> result = null;
             var iconMap = new Dictionary<string, Icon>();
             RunBackground(() =>
@@ -87,6 +84,7 @@ namespace OpenCleaner.UI
                 }
             }, () =>
             {
+                Progress.Stop();
                 programs = result;
                 icons.Images.Clear();
                 foreach (var kv in iconMap)
@@ -112,6 +110,7 @@ namespace OpenCleaner.UI
             var filtered = programs.Where(p => q.Length == 0 ||
                 p.Name.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0 ||
                 (p.Publisher ?? "").IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0).ToList();
+            var list = results.List;
             list.BeginUpdate();
             list.Items.Clear();
             foreach (var p in filtered)
@@ -127,47 +126,51 @@ namespace OpenCleaner.UI
                 it.SubItems.Add(p.Version ?? "");
                 list.Items.Add(it);
             }
+            Theme.Refit(list);
             list.EndUpdate();
+            Reevaluate(btnUninstall, btnOpen);
             long total = filtered.Sum(p => p.SizeKB) * 1024;
-            status.Text = filtered.Count + " programas · " + Util.FormatSize(total) + " (estimado)";
+            SetStatus(q.Length == 0
+                ? filtered.Count + " programas instalados · " + Util.FormatSize(total) + " estimados"
+                : filtered.Count + " de " + programs.Count + " programas");
+            results.SetEmpty(q.Length == 0 ? "Nenhum programa encontrado." : "Nenhum programa corresponde a \"" + q + "\".", "search");
         }
 
         InstalledProgram Selected
         {
-            get { return list.SelectedItems.Count == 0 ? null : (InstalledProgram)list.SelectedItems[0].Tag; }
+            get { return results.List.SelectedItems.Count == 0 ? null : (InstalledProgram)results.List.SelectedItems[0].Tag; }
         }
 
         void Uninstall()
         {
             var p = Selected;
             if (p == null) return;
-            if (MessageBox.Show(this, "Executar o desinstalador de \"" + p.Name + "\"?", "Desinstalar",
+            if (MessageBox.Show(this, "Abrir o desinstalador de \"" + p.Name + "\"?", "Desinstalar",
                                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             try
             {
                 var proc = Programs.Uninstall(p);
-                status.Text = "Desinstalador iniciado. A lista será atualizada quando ele terminar.";
-                if (proc != null)
-                    RunBackground(() => proc.WaitForExit(), Reload);
+                SetStatus("Desinstalador de " + p.Name + " aberto. A lista é atualizada quando ele fechar.");
+                if (proc != null) RunBackground(() => proc.WaitForExit(), Reload);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Não foi possível iniciar o desinstalador:\n" + ex.Message +
-                                "\n\nSe o programa já foi removido, use \"Excluir entrada\".", "Desinstalar",
+                MessageBox.Show(this, "O desinstalador não abriu: " + ex.Message +
+                                "\n\nSe o programa já foi apagado, use Mais > Remover da lista.", "Desinstalar",
                                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
-        void DeleteEntry()
+        void RemoveEntry()
         {
             var p = Selected;
-            if (p == null) return;
+            if (p == null) { SetStatus("Selecione um programa na lista.", StatusKind.Warning); return; }
+            if (p.Hive == RegistryHive.LocalMachine && !Main.RequireAdmin(this, "Remover este programa da lista")) return;
             if (MessageBox.Show(this, "Remover \"" + p.Name + "\" da lista de programas instalados?\n\n" +
-                                "Isto NÃO desinstala o programa; use apenas para entradas de programas que já foram removidos.",
-                                "Excluir entrada", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-            if (Programs.DeleteEntry(p)) { programs.Remove(p); Fill(); }
-            else MessageBox.Show(this, "Sem permissão. Execute o OpenCleaner como administrador.", "Excluir entrada",
-                                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                "Isto não desinstala nada. Use só para programas que já foram apagados e continuam aparecendo.",
+                                "Remover da lista", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+            if (Programs.DeleteEntry(p)) { programs.Remove(p); Fill(); SetStatus(p.Name + " removido da lista.", StatusKind.Good); }
+            else SetStatus("Não foi possível remover " + p.Name + " da lista.", StatusKind.Danger);
         }
 
         void OpenLocation()
@@ -181,7 +184,7 @@ namespace OpenCleaner.UI
                 dir = exe != null ? Path.GetDirectoryName(exe) : null;
             }
             if (dir != null && Directory.Exists(dir.Trim('"'))) Util.ShowInExplorer(dir.Trim('"'));
-            else status.Text = "Local de instalação desconhecido.";
+            else SetStatus("A pasta de instalação de " + p.Name + " não é conhecida.", StatusKind.Warning);
         }
 
         void Export()
@@ -193,6 +196,7 @@ namespace OpenCleaner.UI
                 foreach (var p in programs)
                     sb.AppendLine(string.Join("\t", p.Name, p.Publisher, p.Version, p.InstallDate));
                 File.WriteAllText(d.FileName, sb.ToString(), Encoding.UTF8);
+                SetStatus("Lista salva em " + d.FileName, StatusKind.Good);
             }
         }
     }
@@ -201,34 +205,30 @@ namespace OpenCleaner.UI
 
     class StartupPage : Page
     {
-        readonly ListView list;
-        readonly Label status;
+        readonly ListCard results;
+        readonly Button btnToggle, btnDelete, btnOpen;
 
         public StartupPage(MainForm main)
-            : base(main, "Inicialização", "Programas que abrem junto com o Windows. Desativar é reversível; excluir não.")
+            : base(main, "Inicialização", "Programas que abrem junto com o Windows. Desativar pode ser desfeito; excluir, não.")
         {
-            var side = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 220, FlowDirection = FlowDirection.TopDown, Padding = new Padding(16, 0, 0, 0) };
-            SoftwareUpdatePage.SideButton(side, "Ativar", false, "toggle-right", () => SetEnabled(true));
-            SoftwareUpdatePage.SideButton(side, "Desativar", true, "toggle-left", () => SetEnabled(false));
-            SoftwareUpdatePage.SideButton(side, "Excluir", false, "trash-2", Delete);
-            SoftwareUpdatePage.SideButton(side, "Abrir local", false, "folder-open", OpenLocation);
-            SoftwareUpdatePage.SideButton(side, "Atualizar lista", false, "refresh-cw", Reload);
+            btnToggle = AddAction("Desativar", ButtonKind.Primary, "toggle-left", ToggleSelected);
+            btnDelete = AddAction("Excluir", ButtonKind.Danger, "trash-2", Delete);
+            btnOpen = AddAction("Abrir local", ButtonKind.Secondary, "folder-open", OpenLocation);
+            ToolbarRight.Controls.Add(Theme.MakeMenuButton("Mais", Theme.Item("Atualizar lista", Reload)));
 
-            var card = Theme.MakeCard();
-            card.Dock = DockStyle.Fill;
-            list = Theme.MakeList();
-            list.Columns.Add("Ativado", 70);
-            list.Columns.Add("Programa", 220);
-            list.Columns.Add("Editor", 180);
-            list.Columns.Add("Local", 180);
-            list.Columns.Add("Comando", 420);
+            var list = Theme.MakeList();
+            Theme.Col(list, "Status", 100);
+            Theme.Col(list, "Programa", 220);
+            Theme.Col(list, "Desenvolvedor", 180);
+            Theme.Col(list, "Origem", 170);
+            Theme.Col(list, "Comando", 300);
             Theme.EnableSorting(list);
-            card.Controls.Add(list);
-
-            status = new Label { Dock = DockStyle.Top, Height = 34, ForeColor = Theme.Muted };
-            Body.Controls.Add(card);
-            Body.Controls.Add(side);
-            Body.Controls.Add(status);
+            list.SelectedIndexChanged += (s, e) => UpdateToggle();
+            results = new ListCard(list) { Dock = DockStyle.Fill };
+            Body.Controls.Add(results);
+            BindToSelection(btnToggle, list);
+            BindToSelection(btnDelete, list);
+            BindToSelection(btnOpen, list);
         }
 
         public override void Activated() { Reload(); }
@@ -236,43 +236,75 @@ namespace OpenCleaner.UI
         void Reload()
         {
             var entries = Startup.List();
+            var list = results.List;
             list.BeginUpdate();
             list.Items.Clear();
             foreach (var e in entries.OrderBy(x => !x.Enabled).ThenBy(x => x.Name))
             {
-                var it = new ListViewItem(new[] { e.Enabled ? "Sim" : "Não", e.Name, e.Publisher, e.Location, e.Command }) { Tag = e };
-                if (!e.Enabled) it.ForeColor = Theme.Muted;
+                var it = new ListViewItem(e.Enabled ? "Ativo" : "Desativado") { Tag = e };
+                it.SubItems.Add(e.Name);
+                it.SubItems.Add(e.Publisher);
+                it.SubItems.Add(e.Location);
+                Theme.MonoCell(it, e.Command);
+                if (!e.Enabled) foreach (ListViewItem.ListViewSubItem sub in it.SubItems) sub.ForeColor = Theme.Grafite;
+                else it.SubItems[0].ForeColor = Theme.Verde;
                 list.Items.Add(it);
             }
+            Theme.Refit(list);
             list.EndUpdate();
+            Reevaluate(btnToggle, btnDelete, btnOpen);
             int on = entries.Count(x => x.Enabled);
-            status.Text = on + " de " + entries.Count + " programas ativados na inicialização" +
-                          (Util.IsAdmin() ? "" : " · alterar itens de \"Todos os usuários\" exige administrador");
+            SetStatus(on + " de " + entries.Count + " programas abrem com o Windows.");
+            results.SetEmpty("Nenhum programa abre junto com o Windows.", "power");
         }
 
         StartupEntry Selected
         {
-            get { return list.SelectedItems.Count == 0 ? null : (StartupEntry)list.SelectedItems[0].Tag; }
+            get { return results.List.SelectedItems.Count == 0 ? null : (StartupEntry)results.List.SelectedItems[0].Tag; }
         }
 
-        void SetEnabled(bool on)
+        /// <summary>O botão principal alterna entre Ativar e Desativar conforme o item selecionado.</summary>
+        void UpdateToggle()
+        {
+            var e = Selected;
+            bool enable = e != null && !e.Enabled;
+            btnToggle.Text = enable ? "Ativar" : "Desativar";
+        }
+
+        void ToggleSelected()
         {
             var e = Selected;
             if (e == null) return;
-            try { Startup.SetEnabled(e, on); }
-            catch (Exception ex) { MessageBox.Show(this, "Não foi possível alterar: " + ex.Message, "Inicialização", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            if (e.Hive == RegistryHive.LocalMachine && !Main.RequireAdmin(this, "Alterar um programa de todos os usuários")) return;
+            bool enable = !e.Enabled;
+            try
+            {
+                Startup.SetEnabled(e, enable);
+                SetStatus(e.Name + (enable ? " ativado." : " desativado."), StatusKind.Good);
+            }
+            catch (Exception ex) { SetStatus("Não foi possível alterar " + e.Name + ": " + ex.Message, StatusKind.Danger); }
+            string key = e.Name;
+            string msg = StatusText;
             Reload();
+            SetStatus(msg, StatusKind.Good);
+            foreach (ListViewItem it in results.List.Items)
+                if (((StartupEntry)it.Tag).Name == key) { it.Selected = true; it.Focused = true; break; }
         }
 
         void Delete()
         {
             var e = Selected;
             if (e == null) return;
-            if (MessageBox.Show(this, "Remover \"" + e.Name + "\" da inicialização?\n\nPrefira Desativar se quiser poder voltar atrás.",
+            if (e.Hive == RegistryHive.LocalMachine && !Main.RequireAdmin(this, "Excluir um programa de todos os usuários")) return;
+            if (MessageBox.Show(this, "Excluir \"" + e.Name + "\" da inicialização?\n\nIsto não pode ser desfeito. Se quiser só impedir que abra, use Desativar.",
                                 "Excluir", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-            try { Startup.Delete(e); }
-            catch (Exception ex) { MessageBox.Show(this, "Não foi possível excluir: " + ex.Message, "Inicialização", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
-            Reload();
+            try
+            {
+                Startup.Delete(e);
+                Reload();
+                SetStatus(e.Name + " excluído da inicialização.", StatusKind.Good);
+            }
+            catch (Exception ex) { SetStatus("Não foi possível excluir " + e.Name + ": " + ex.Message, StatusKind.Danger); }
         }
 
         void OpenLocation()
@@ -281,7 +313,7 @@ namespace OpenCleaner.UI
             if (e == null) return;
             string path = e.IsFile ? e.FilePath : Util.ExtractExePath(e.Command);
             if (path != null && (File.Exists(path) || Directory.Exists(path))) Util.ShowInExplorer(path);
-            else status.Text = "Arquivo não encontrado: " + (path ?? e.Command);
+            else SetStatus("O arquivo de " + e.Name + " não existe mais: " + (path ?? e.Command), StatusKind.Warning);
         }
     }
 }
