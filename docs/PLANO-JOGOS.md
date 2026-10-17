@@ -1,6 +1,6 @@
 # Plano: menu Jogos
 
-Status: etapas 1 a 4 implementadas. O núcleo está em `src/Core/Games.cs`, `GameLibrary.cs` e
+Status: etapas 1 a 5 implementadas. O núcleo está em `src/Core/Games.cs`, `GameLibrary.cs` e
 `GpuPreference.cs`; a interface, em `src/UI/GamesPage.cs`, no item "Jogos" da barra lateral e num 4º
 cartão na Verificação de saúde. Testes: `tests/RealTests.cs` e capturas em `tests/SmokeTest.cs`. Os quatro
 cartões ficam sempre numa linha: duas linhas não cabem na altura mínima da janela.
@@ -151,10 +151,10 @@ pasta). Launchers (Steam, Epic, Riot Client, Battle.net) não entram.
 | Id | Mostra | Abre | Por quê |
 |---|---|---|---|
 | `background-recording` | "Gravar o que aconteceu" ligado (`...\CurrentVersion\GameDVR` `HistoricalCaptureEnabled=1`) | `ms-settings:gaming-gamedvr` | Gravar em segundo plano custa desempenho; desligar se não usa |
-| `hags` | Agendamento de GPU acelerado por hardware (`GraphicsDrivers` `HwSchMode`: 2 = ligado) | `ms-settings:display-advancedgraphics` | Exigido pelo *Frame Generation* da NVIDIA (DLSS 3). Só aparece se o driver oferece a opção |
-| `windowed-optimizations` | Otimizações para jogos em janela (`DirectXUserGlobalSettings` `SwapEffectUpgradeEnable`), no Windows 11 | `ms-settings:display-advancedgraphics` | Menor latência e VRR em jogos em janela sem bordas |
-| `power-mode` | Em PC de mesa ou na tomada: modo de energia diferente de *Melhor desempenho* | `ms-settings:powersleep` | Aqui é só uma informação; em notebook na bateria, nada é sugerido |
-| `mouse-precision` | "Aumentar a precisão do ponteiro" ligado (`Control Panel\Mouse` `MouseSpeed=1`) | Propriedades do Mouse (`main.cpl`) | A aceleração muda a mira conforme a velocidade da mão; jogadores de tiro costumam desligar |
+| `hags` | Agendamento de GPU acelerado por hardware (`GraphicsDrivers` `HwSchMode`: 2 = ligado) | `ms-settings:display-advancedgraphics` | Exigido pelo *Frame Generation* da NVIDIA (DLSS 3). Aparece só com `HwSchMode=1` (desligado de propósito): sem o valor, não dá para saber se o driver oferece a opção |
+| `windowed-optimizations` | Otimizações para jogos em janela (`DirectXUserGlobalSettings` `SwapEffectUpgradeEnable`), no Windows 11 | `ms-settings:display-advancedgraphics` | Menor latência e VRR em jogos em janela sem bordas. Aparece só com `SwapEffectUpgradeEnable=0` explícito, porque o padrão sem o valor muda entre versões do Windows 11 |
+| ~~`power-mode`~~ | Fora da etapa 5: os GUIDs e nomes das sobreposições de energia mudam entre Windows 10 e 11 e não foram confirmados; num notebook o item nunca apareceria | — | Rever junto com um PC de mesa para testar |
+| `mouse-precision` | "Aumentar a precisão do ponteiro" ligado (`Control Panel\Mouse` `MouseSpeed` 1 ou 2) | Propriedades do Mouse (`main.cpl`) | A aceleração muda a mira conforme a velocidade da mão; jogadores de tiro costumam desligar |
 
 ### Desempenho × segurança (só informação)
 

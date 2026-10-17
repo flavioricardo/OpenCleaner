@@ -16,9 +16,18 @@ namespace OpenCleaner.Core
         public int? Value;
     }
 
-    /// <summary>Algo que um otimizador mudou e que prejudica jogos, segurança ou bateria.</summary>
+    /// <summary>
+    /// Fix: desfeito pelo OpenCleaner. Recommended: opção do Windows que ajuda em jogos, escolha do usuário.
+    /// Tradeoff: ganha desempenho em troca de proteção. Os dois últimos só leem e abrem a página do Windows.
+    /// </summary>
+    enum GameKind { Fix, Recommended, Tradeoff }
+
+    /// <summary>Algo que um otimizador mudou e que prejudica, ou uma opção do Windows que vale conhecer.</summary>
     class GameFinding
     {
+        public GameKind Kind = GameKind.Fix;
+        /// <summary>Página do Windows onde o usuário muda a opção (Recommended e Tradeoff).</summary>
+        public string SettingsUri;
         public string Id, Name, Why, Location, Current, Expected;
         public bool NeedsAdmin, DefaultChecked = true;
         public readonly List<RegEdit> Edits = new List<RegEdit>();
@@ -36,22 +45,67 @@ namespace OpenCleaner.Core
         public Func<string, bool> SetActivePowerScheme;
         /// <summary>Abre um endereço ms-windows-store:// do catálogo.</summary>
         public Func<string, bool> OpenStore;
+        /// <summary>Número do build do Windows (22000 ou mais = Windows 11); 0 = desconhecido.</summary>
+        public int WindowsBuild;
+        /// <summary>Integridade de Memória (HVCI) em execução agora.</summary>
+        public Func<bool> MemoryIntegrityRunning;
 
         public static GameContext System()
         {
+            var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, Environment.Is64BitOperatingSystem ? RegistryView.Registry64 : RegistryView.Default);
+            int build = 0;
+            using (var k = hklm.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion"))
+                if (k != null) int.TryParse(Util.ReadString(k, "CurrentBuild"), out build);
             return new GameContext
             {
-                Hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, Environment.Is64BitOperatingSystem ? RegistryView.Registry64 : RegistryView.Default),
+                Hklm = hklm,
                 Hkcu = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, RegistryView.Default),
                 HasBattery = Util.HasBattery(),
+                WindowsBuild = build,
                 SetActivePowerScheme = PowerCfgSetActive,
                 OpenStore = uri =>
                 {
                     if (!uri.StartsWith("ms-windows-store://pdp/?ProductId=", StringComparison.Ordinal)) return false;
                     try { Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true }); return true; }
                     catch { return false; }
-                }
+                },
+                MemoryIntegrityRunning = HvciRunning
             };
+        }
+
+        /// <summary>Win32_DeviceGuard: SecurityServicesRunning contém 2 quando a Integridade de Memória está ativa.</summary>
+        static bool HvciRunning()
+        {
+            try
+            {
+                using (var s = new System.Management.ManagementObjectSearcher(@"root\Microsoft\Windows\DeviceGuard", "SELECT SecurityServicesRunning FROM Win32_DeviceGuard"))
+                    foreach (System.Management.ManagementObject o in s.Get())
+                        using (o)
+                        {
+                            var running = o["SecurityServicesRunning"] as uint[];
+                            if (running != null && running.Contains(2u)) return true;
+                        }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>
+        /// Abre uma página do Windows do catálogo. Só aceita os endereços fixos que o GameScanner usa:
+        /// nada vindo do registro ou de arquivos vira linha de comando.
+        /// </summary>
+        public static bool OpenSettings(string uri)
+        {
+            try
+            {
+                if (uri == "main.cpl")
+                    Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "control.exe"), "main.cpl") { UseShellExecute = false });
+                else if (GameScanner.SettingsPages.Contains(uri))
+                    Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
+                else return false;
+                return true;
+            }
+            catch { return false; }
         }
 
         static bool PowerCfgSetActive(string guid)
@@ -90,6 +144,18 @@ namespace OpenCleaner.Core
         /// <summary>Pacotes da Store registrados para o usuário: uma subchave por pacote (Nome_Versão_Arq__Editor).</summary>
         const string Packages = @"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages";
 
+        const string GameDvr = @"Software\Microsoft\Windows\CurrentVersion\GameDVR";
+        const string GraphicsDrivers = @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers";
+        const string DirectXUser = @"Software\Microsoft\DirectX\UserGpuPreferences";
+        const string Mouse = @"Control Panel\Mouse";
+
+        const string CapturesPage = "ms-settings:gaming-gamedvr";
+        const string GraphicsPage = "ms-settings:display-advancedgraphics";
+        const string CoreIsolationPage = "windowsdefender://coreisolation";
+
+        /// <summary>As únicas páginas que GameContext.OpenSettings abre (além de main.cpl).</summary>
+        public static readonly HashSet<string> SettingsPages = new HashSet<string>(StringComparer.Ordinal) { CapturesPage, GraphicsPage, CoreIsolationPage };
+
         /// <summary>Apps de sistema que fazem o login na conta Xbox dos jogos, com o ID de cada um na Microsoft Store.</summary>
         static readonly string[,] XboxApps =
         {
@@ -109,7 +175,9 @@ namespace OpenCleaner.Core
         public static List<GameFinding> Scan(GameContext c)
         {
             var found = new List<GameFinding>();
-            foreach (var check in new Action<GameContext, List<GameFinding>>[] { GameMode, GameDvr, XboxSignIn, Background, PowerPlan })
+            foreach (var check in new Action<GameContext, List<GameFinding>>[]
+                { GameMode, GameDvrPolicyCheck, XboxSignIn, Background, PowerPlan,
+                  BackgroundRecording, HardwareScheduling, WindowedOptimizations, MousePrecision, MemoryIntegrity })
             {
                 try { check(c, found); }
                 catch { }
@@ -161,7 +229,7 @@ namespace OpenCleaner.Core
             found.Add(f);
         }
 
-        static void GameDvr(GameContext c, List<GameFinding> found)
+        static void GameDvrPolicyCheck(GameContext c, List<GameFinding> found)
         {
             if (ReadDword(c.Hklm, GameDvrPolicy, "AllowGameDVR") != 0) return;
             var f = new GameFinding
@@ -326,6 +394,86 @@ namespace OpenCleaner.Core
             found.Add(f);
         }
 
+        // ---- Recomendado para jogos e Desempenho × segurança: só leem e abrem a página do Windows ----
+
+        static GameFinding Advice(GameKind kind, string id, string page)
+        {
+            return new GameFinding { Kind = kind, Id = id, SettingsUri = page, DefaultChecked = false };
+        }
+
+        static void BackgroundRecording(GameContext c, List<GameFinding> found)
+        {
+            if (ReadDword(c.Hkcu, GameDvr, "HistoricalCaptureEnabled") != 1) return;
+            var f = Advice(GameKind.Recommended, "background-recording", CapturesPage);
+            f.Name = L.T("Gravação em segundo plano ligada", "Background recording on");
+            f.Why = L.T("\"Gravar o que aconteceu\" grava os últimos minutos de todo jogo o tempo todo, para você salvar um lance depois. Isso usa a placa de vídeo e o disco durante a partida. Se você não usa, desligar devolve esse desempenho ao jogo.",
+                        "\"Record what happened\" keeps recording the last minutes of every game all the time, so you can save a moment later. That uses the graphics card and the disk while you play. If you do not use it, turning it off gives that performance back to the game.");
+            f.Location = Where(c.Hkcu, GameDvr, "HistoricalCaptureEnabled");
+            f.Current = L.T("ligada", "on");
+            f.Expected = L.T("desligar, se não usa", "turn off if unused");
+            found.Add(f);
+        }
+
+        static void HardwareScheduling(GameContext c, List<GameFinding> found)
+        {
+            // Só quando está explicitamente desligado (1): ausente pode querer dizer que o driver nem oferece a opção.
+            if (ReadDword(c.Hklm, GraphicsDrivers, "HwSchMode") != 1) return;
+            var f = Advice(GameKind.Recommended, "hags", GraphicsPage);
+            f.Name = L.T("Agendamento de GPU acelerado por hardware desligado", "Hardware-accelerated GPU scheduling off");
+            f.Why = L.T("Com o agendamento ligado, a própria placa de vídeo organiza o trabalho dela, o que pode reduzir a latência. O Frame Generation da NVIDIA (DLSS 3) exige essa opção. Mudar pede reiniciar o PC.",
+                        "With scheduling on, the graphics card organizes its own work, which can reduce latency. NVIDIA Frame Generation (DLSS 3) requires it. Changing it needs a restart.");
+            f.Location = Where(c.Hklm, GraphicsDrivers, "HwSchMode");
+            f.Current = L.T("desligado", "off");
+            f.Expected = L.T("ligar", "turn on");
+            found.Add(f);
+        }
+
+        static void WindowedOptimizations(GameContext c, List<GameFinding> found)
+        {
+            if (c.WindowsBuild < 22000) return; // opção do Windows 11
+            string value;
+            using (var k = c.Hkcu.OpenSubKey(DirectXUser))
+                value = k == null ? null : Util.ReadString(k, "DirectXUserGlobalSettings");
+            if (value == null || value.IndexOf("SwapEffectUpgradeEnable=0", StringComparison.OrdinalIgnoreCase) < 0) return;
+            var f = Advice(GameKind.Recommended, "windowed-optimizations", GraphicsPage);
+            f.Name = L.T("Otimizações para jogos em janela desligadas", "Optimizations for windowed games off");
+            f.Why = L.T("No Windows 11, essa opção faz jogos em janela sem bordas funcionarem quase como em tela cheia: menos latência e suporte a taxa de atualização variável (G-Sync, FreeSync).",
+                        "On Windows 11, this option makes borderless windowed games work almost like full screen: lower latency and variable refresh rate support (G-Sync, FreeSync).");
+            f.Location = Where(c.Hkcu, DirectXUser, "DirectXUserGlobalSettings");
+            f.Current = L.T("desligadas", "off");
+            f.Expected = L.T("ligar", "turn on");
+            found.Add(f);
+        }
+
+        static void MousePrecision(GameContext c, List<GameFinding> found)
+        {
+            string speed;
+            using (var k = c.Hkcu.OpenSubKey(Mouse))
+                speed = k == null ? null : Util.ReadString(k, "MouseSpeed");
+            if (speed != "1" && speed != "2") return;
+            var f = Advice(GameKind.Recommended, "mouse-precision", "main.cpl");
+            f.Name = L.T("\"Aumentar a precisão do ponteiro\" ligado", "\"Enhance pointer precision\" on");
+            f.Why = L.T("Essa opção acelera o ponteiro conforme a velocidade da mão: o mesmo movimento leva a mira a lugares diferentes. Em jogos de tiro, desligar deixa a mira previsível. Muitos jogos já ignoram a opção (entrada direta); vale para os que não ignoram. Fica na aba Opções de ponteiro.",
+                        "This option speeds up the pointer based on how fast you move your hand: the same motion lands your aim in different places. In shooters, turning it off makes aiming predictable. Many games already ignore it (raw input); it matters for those that do not. It is on the Pointer Options tab.");
+            f.Location = Where(c.Hkcu, Mouse, "MouseSpeed");
+            f.Current = L.T("ligado", "on");
+            f.Expected = L.T("desligar, para jogos de tiro", "turn off for shooters");
+            found.Add(f);
+        }
+
+        static void MemoryIntegrity(GameContext c, List<GameFinding> found)
+        {
+            if (c.MemoryIntegrityRunning == null || !c.MemoryIntegrityRunning()) return;
+            var f = Advice(GameKind.Tradeoff, "memory-integrity", CoreIsolationPage);
+            f.Name = L.T("Integridade de Memória ligada", "Memory integrity on");
+            f.Why = L.T("A Integridade de Memória impede que drivers maliciosos ou com falha rodem no núcleo do Windows. A Microsoft diz que desligar pode melhorar o desempenho em alguns jogos, em troca de menos proteção. O OpenCleaner não recomenda nem desliga: a escolha é sua, em Segurança do Windows.",
+                        "Memory integrity keeps malicious or faulty drivers from running in the Windows core. Microsoft says turning it off can improve performance in some games, at the cost of less protection. OpenCleaner neither recommends nor changes it: it is your choice, in Windows Security.");
+            f.Location = L.T("Segurança do Windows > Isolamento de núcleo", "Windows Security > Core isolation");
+            f.Current = L.T("ligada (mais proteção)", "on (more protection)");
+            f.Expected = L.T("escolha sua", "your choice");
+            found.Add(f);
+        }
+
         // ---- Backup e conserto ----
 
         /// <summary>Chaves que os consertos vão alterar, no formato do Util.ExportRegistry.</summary>
@@ -343,6 +491,7 @@ namespace OpenCleaner.Core
 
         public static bool Fix(GameFinding f)
         {
+            if (f.Kind != GameKind.Fix) return false; // recomendações só abrem a página do Windows
             bool ok = true;
             foreach (var e in f.Edits)
             {

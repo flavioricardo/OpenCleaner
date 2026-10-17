@@ -16,6 +16,15 @@ static class SmokeTest
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     static extern int GetWindowLong(IntPtr hWnd, int nIndex);
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    /// <summary>Imagem de estado da linha (0 = sem caixa, 1 = desmarcada, 2 = marcada), via LVM_GETITEMSTATE.</summary>
+    static int StateImage(ListViewItem it)
+    {
+        return ((int)SendMessage(it.ListView.Handle, 0x102C, (IntPtr)it.Index, (IntPtr)0xF000) & 0xF000) >> 12;
+    }
+
     static IEnumerable<ListView> AllLists(Control root)
     {
         foreach (Control c in root.Controls)
@@ -292,6 +301,22 @@ static class SmokeTest
             Check(hybrid == (gameItem != null), "jogos: grupo de GPU aparece só em notebook com duas placas (" + (hybrid ? "híbrido" : "não híbrido") + ")");
             if (gameItem != null) { gameItem.Selected = true; gameItem.EnsureVisible(); pump(0.5); }
             shot("games-gpu");
+            // Recomendação selecionada: o painel mostra o link para a página do Windows (só a captura, não clica).
+            var adviceItem = AllLists(form).SelectMany(l => l.Items.Cast<ListViewItem>())
+                                           .FirstOrDefault(i => i.Tag is GameFinding && ((GameFinding)i.Tag).Kind != GameKind.Fix);
+            if (adviceItem != null)
+            {
+                adviceItem.ListView.SelectedItems.Clear();
+                adviceItem.Selected = true;
+                adviceItem.EnsureVisible();
+                pump(0.5);
+                Check(StateImage(adviceItem) == 0, "jogos: recomendação aparece sem caixa de seleção");
+                adviceItem.ListView.ContextMenuStrip.Items[0].PerformClick(); // "Marcar todos"
+                pump(0.3);
+                Check(!adviceItem.Checked && StateImage(adviceItem) == 0 && adviceItem.ListView.CheckedItems.Count > 0,
+                      "jogos: \"Marcar todos\" marca os consertos e deixa a recomendação sem caixa (imagem=" + StateImage(adviceItem) + ")");
+                shot("games-advice");
+            }
         }
         finally
         {

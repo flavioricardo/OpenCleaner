@@ -311,7 +311,7 @@ namespace OpenCleaner.UI
                 startupOn = st.Count(e => e.Enabled);
                 startupTotal = st.Count;
                 Ui(() => verdict.Text = L.T("Verificando ajustes para jogos...", "Checking gaming settings..."));
-                gameFixes = GameScanner.Scan(GameContext.System()).Count;
+                gameFixes = GameScanner.Scan(GameContext.System()).Count(f => f.Kind == GameKind.Fix); // recomendações não são problemas
                 if (GpuPreference.IsHybridLaptop(GpuPreference.Adapters(), Util.HasBattery()))
                     gamesOffGpu = GameLibrary.Find(GameSources.System())
                                              .Count(g => GpuPreference.StateOf(Registry.CurrentUser, g) != GpuPreference.HighPerformance);

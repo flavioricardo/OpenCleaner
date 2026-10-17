@@ -17,6 +17,7 @@ namespace OpenCleaner.UI
     {
         readonly ListCard results;
         readonly Label why;
+        readonly LinkLabel openSettings;
         readonly Button btnScan, btnApply;
         string adaptersText = "";
         bool busy, scanned;
@@ -40,6 +41,13 @@ namespace OpenCleaner.UI
             menu.Opening += (s, e) => reset.Visible = folder.Visible = SelectedGame() != null;
             list.ContextMenuStrip = menu;
             list.SelectedIndexChanged += (s, e) => ShowWhy();
+            // Recomendações não se aplicam daqui: não têm caixa (sem ela, o clique não marca) e o link abre a
+            // página do Windows. A barra de espaço marcaria mesmo sem caixa, então é ignorada nelas.
+            list.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Space && list.SelectedItems.Cast<ListViewItem>().Any(IsAdvice)) e.SuppressKeyPress = e.Handled = true;
+            };
+            list.ItemActivate += (s, e) => OpenSelectedSettings();
             results = new ListCard(list) { Dock = DockStyle.Fill };
             results.SetEmpty(L.T("Verificando...", "Checking..."), "gamepad-2");
             BindToSelection(btnApply, list, true, () => !busy);
@@ -49,12 +57,41 @@ namespace OpenCleaner.UI
             whyCard.Height = Theme.S(104);
             whyCard.Padding = Theme.Pad(16, 12, 16, 12);
             why = new Label { Dock = DockStyle.Fill, ForeColor = Theme.Grafite };
+            openSettings = new LinkLabel
+            {
+                Dock = DockStyle.Bottom, AutoSize = true, Font = Theme.Bold, Visible = false,
+                LinkColor = Theme.Verde, ActiveLinkColor = Theme.Verde, LinkBehavior = LinkBehavior.HoverUnderline
+            };
+            openSettings.LinkClicked += (s, e) => OpenSelectedSettings();
             whyCard.Controls.Add(why);
+            whyCard.Controls.Add(openSettings);
 
             Body.Controls.Add(results);
             Body.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = Theme.S(12) });
             Body.Controls.Add(whyCard);
             ShowWhy();
+        }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        struct LvItem
+        {
+            public int mask, iItem, iSubItem, state, stateMask;
+            public IntPtr pszText;
+            public int cchTextMax, iImage;
+            public IntPtr lParam;
+            public int iIndent, iGroupId, cColumns;
+            public IntPtr puColumns;
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, ref LvItem lParam);
+
+        /// <summary>Tira a caixa de seleção de uma linha (imagem de estado 0): recomendações não se aplicam daqui.</summary>
+        static void HideCheckBox(ListView lv, int index)
+        {
+            if (!lv.IsHandleCreated) return;
+            var item = new LvItem { stateMask = 0xF000, state = 0 }; // LVIS_STATEIMAGEMASK
+            SendMessage(lv.Handle, 0x102B, (IntPtr)index, ref item);   // LVM_SETITEMSTATE
         }
 
         public override void Activated()
@@ -67,19 +104,45 @@ namespace OpenCleaner.UI
             return results.List.SelectedItems.Count == 0 ? null : results.List.SelectedItems[0].Tag as InstalledGame;
         }
 
+        static bool IsAdvice(ListViewItem it)
+        {
+            var f = it.Tag as GameFinding;
+            return f != null && f.Kind != GameKind.Fix;
+        }
+
         void CheckAll(bool on)
         {
             results.List.BeginUpdate();
-            foreach (ListViewItem it in results.List.Items) it.Checked = on;
+            foreach (ListViewItem it in results.List.Items)
+                if (!IsAdvice(it)) it.Checked = on;
             results.List.EndUpdate();
+        }
+
+        GameFinding SelectedAdvice()
+        {
+            var f = results.List.SelectedItems.Count == 0 ? null : results.List.SelectedItems[0].Tag as GameFinding;
+            return f != null && f.SettingsUri != null ? f : null;
+        }
+
+        void OpenSelectedSettings()
+        {
+            var f = SelectedAdvice();
+            if (f != null && !GameContext.OpenSettings(f.SettingsUri))
+                SetStatus(L.T("Não foi possível abrir a página do Windows.", "Could not open the Windows page."), StatusKind.Danger);
         }
 
         void ShowWhy()
         {
+            var advice = SelectedAdvice();
+            openSettings.Visible = advice != null;
+            if (advice != null)
+                openSettings.Text = advice.SettingsUri == "main.cpl" ? L.T("Abrir Propriedades do Mouse", "Open Mouse Properties")
+                                  : advice.SettingsUri.StartsWith("windowsdefender:") ? L.T("Abrir Segurança do Windows", "Open Windows Security")
+                                  : L.T("Abrir nas Configurações", "Open in Settings");
             if (results.List.SelectedItems.Count == 0)
             {
-                why.Text = L.T("Selecione um item para ver por que ele importa. Itens de otimizadores voltam ao padrão do Windows; dá para salvar um backup antes.",
-                               "Select an item to see why it matters. Optimizer items go back to the Windows default; you can save a backup first.");
+                why.Text = L.T("Selecione um item para ver por que ele importa. Itens de otimizadores voltam ao padrão do Windows; dá para salvar um backup antes. As recomendações só abrem a página certa do Windows.",
+                               "Select an item to see why it matters. Optimizer items go back to the Windows default; you can save a backup first. Recommendations only open the right Windows page.");
                 return;
             }
             var tag = results.List.SelectedItems[0].Tag;
@@ -125,18 +188,24 @@ namespace OpenCleaner.UI
                 Progress.Stop();
                 findings = findings ?? new List<GameFinding>();
                 games = games ?? new List<InstalledGame>();
+                var fixes = findings.Where(f => f.Kind == GameKind.Fix).ToList();
+                var advice = findings.Where(f => f.Kind == GameKind.Recommended).ToList();
+                var tradeoffs = findings.Where(f => f.Kind == GameKind.Tradeoff).ToList();
                 list.BeginUpdate();
-                if (findings.Count > 0)
+                Action<string, string, List<GameFinding>> addGroup = (key, title, items) =>
                 {
-                    var group = list.Groups.Add("fix", L.T("Deixado por otimizadores", "Left by optimizers") + " (" + findings.Count + ")");
-                    foreach (var f in findings)
+                    if (items.Count == 0) return;
+                    var group = list.Groups.Add(key, title + " (" + items.Count + ")");
+                    foreach (var f in items)
                     {
-                        var it = new ListViewItem(f.Name, group) { Tag = f, Checked = f.DefaultChecked };
+                        var it = new ListViewItem(f.Name, group) { Tag = f, Checked = f.Kind == GameKind.Fix && f.DefaultChecked };
                         it.SubItems.Add(f.Current + " → " + f.Expected);
                         Theme.MonoCell(it, f.Location);
+                        if (f.Kind == GameKind.Tradeoff) it.ForeColor = Theme.Ambar;
                         list.Items.Add(it);
                     }
-                }
+                };
+                addGroup("fix", L.T("Deixado por otimizadores", "Left by optimizers"), fixes);
                 int pending = 0;
                 if (games.Count > 0)
                 {
@@ -154,20 +223,26 @@ namespace OpenCleaner.UI
                         list.Items.Add(it);
                     }
                 }
+                addGroup("advice", L.T("Recomendado para jogos: muda nas Configurações", "Recommended for gaming: change it in Settings"), advice);
+                addGroup("tradeoff", L.T("Desempenho × segurança: escolha sua", "Performance × security: your choice"), tradeoffs);
                 Theme.Refit(list);
                 list.EndUpdate();
+                foreach (ListViewItem it in list.Items)
+                    if (IsAdvice(it)) HideCheckBox(list, it.Index);
                 Reevaluate(btnApply);
 
                 var parts = new List<string>();
-                if (findings.Count == 1) parts.Add(L.T("1 ajuste deixado por otimizadores", "1 setting left by optimizers"));
-                else if (findings.Count > 1) parts.Add(L.F("{0} ajustes deixados por otimizadores", "{0} settings left by optimizers", findings.Count));
+                if (fixes.Count == 1) parts.Add(L.T("1 ajuste deixado por otimizadores", "1 setting left by optimizers"));
+                else if (fixes.Count > 1) parts.Add(L.F("{0} ajustes deixados por otimizadores", "{0} settings left by optimizers", fixes.Count));
                 if (pending == 1) parts.Add(L.T("1 jogo fora da placa dedicada", "1 game not set to the dedicated card"));
                 else if (pending > 1) parts.Add(L.F("{0} jogos fora da placa dedicada", "{0} games not set to the dedicated card", pending));
-                if (parts.Count == 0)
+                if (parts.Count > 0)
+                    SetStatus(string.Join(L.T(" e ", " and "), parts) + L.T(". Revise e clique em Aplicar marcados.", ". Review them and click Apply checked."));
+                else if (advice.Count + tradeoffs.Count > 0)
+                    SetStatus(L.T("Nada para consertar. Veja abaixo as opções do Windows que valem para jogos.", "Nothing to fix. See below the Windows options that matter for gaming."), StatusKind.Good);
+                else
                     SetStatus(L.T("Tudo certo para jogar.", "All set for gaming.") +
                               (hybrid ? "" : L.T(" Este PC não é um notebook com duas placas de vídeo, então não há placa para escolher.", " This PC is not a laptop with two graphics cards, so there is no card to choose.")), StatusKind.Good);
-                else
-                    SetStatus(string.Join(L.T(" e ", " and "), parts) + L.T(". Revise e clique em Aplicar marcados.", ". Review them and click Apply checked."));
                 results.SetEmpty(L.T("Nenhum ajuste de otimizador encontrado.\nA verificação só olha: nada muda até você aplicar.",
                                      "No optimizer settings found.\nThe check only looks: nothing changes until you apply."), "circle-check");
                 ShowWhy();
@@ -193,7 +268,7 @@ namespace OpenCleaner.UI
                 items = items.Where(i => !admin(i)).ToList();
                 if (items.Count == 0) return;
             }
-            var findings = items.Select(i => i.Tag).OfType<GameFinding>().ToList();
+            var findings = items.Select(i => i.Tag).OfType<GameFinding>().Where(f => f.Kind == GameKind.Fix).ToList();
             var games = items.Select(i => i.Tag).OfType<InstalledGame>().ToList();
 
             var keys = GameScanner.BackupKeys(findings).ToList();

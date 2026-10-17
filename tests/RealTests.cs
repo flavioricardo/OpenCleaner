@@ -743,6 +743,42 @@ static class RealTests
         Check(xbox(new[] { store, identity, tcui, xboxApp, services }, "F").Count == 0, "tudo instalado: nada é apontado");
         Check(all.Count == 1 && all[0].Edits.Count == 0 && !all[0].NeedsAdmin, "o item não mexe no registro nem pede administrador");
 
+        // Recomendado para jogos e Desempenho × segurança: só leem; nada é gravado e o conserto recusa.
+        using (var hklm = Registry.CurrentUser.CreateSubKey(TestKey + @"\Advice\HKLM"))
+        using (var hkcu = Registry.CurrentUser.CreateSubKey(TestKey + @"\Advice\HKCU"))
+        {
+            bool hvci = false;
+            var ctx = new GameContext { Hklm = hklm, Hkcu = hkcu, WindowsBuild = 22631, MemoryIntegrityRunning = () => hvci };
+            Func<List<string>> adviceIds = () => GameScanner.Scan(ctx).Where(f => f.Kind != GameKind.Fix).Select(f => f.Id).ToList();
+            Check(adviceIds().Count == 0, "recomendações: registro vazio não sugere nada");
+
+            Dword(hkcu, @"Software\Microsoft\Windows\CurrentVersion\GameDVR", "HistoricalCaptureEnabled", 1);
+            Dword(hklm, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers", "HwSchMode", 1);
+            using (var k = hkcu.CreateSubKey(@"Software\Microsoft\DirectX\UserGpuPreferences")) k.SetValue("DirectXUserGlobalSettings", "SwapEffectUpgradeEnable=0;");
+            using (var k = hkcu.CreateSubKey(@"Control Panel\Mouse")) k.SetValue("MouseSpeed", "1");
+            hvci = true;
+            var advice = GameScanner.Scan(ctx).Where(f => f.Kind != GameKind.Fix).ToList();
+            var ids = advice.Select(f => f.Id).ToList();
+            string[] expected = { "background-recording", "hags", "windowed-optimizations", "mouse-precision", "memory-integrity" };
+            Check(expected.All(ids.Contains) && ids.Count == expected.Length, "as 5 opções do Windows aparecem (achou " + string.Join(", ", ids) + ")");
+            Check(advice.Single(f => f.Id == "memory-integrity").Kind == GameKind.Tradeoff && advice.Where(f => f.Id != "memory-integrity").All(f => f.Kind == GameKind.Recommended),
+                  "Integridade de Memória fica em Desempenho × segurança; o resto em Recomendado");
+            Check(advice.All(f => f.Edits.Count == 0 && f.Run == null && !f.DefaultChecked &&
+                                  (f.SettingsUri == "main.cpl" || GameScanner.SettingsPages.Contains(f.SettingsUri))),
+                  "nenhuma recomendação grava nada: sem alterações, desmarcadas e com uma página fixa do Windows");
+            Check(advice.All(f => !GameScanner.Fix(f)) && Equals(Value(hklm, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers", "HwSchMode"), 1) &&
+                  Equals(Value(hkcu, @"Control Panel\Mouse", "MouseSpeed"), "1"), "o conserto recusa recomendações e o registro fica igual");
+            Check(!GameContext.OpenSettings("calc.exe") && !GameContext.OpenSettings("https://example.com") && !GameContext.OpenSettings("ms-settings:windowsupdate"),
+                  "só abre as páginas do catálogo: outros endereços são recusados");
+
+            ctx.WindowsBuild = 19045;
+            Dword(hklm, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers", "HwSchMode", 2);
+            using (var k = hkcu.CreateSubKey(@"Control Panel\Mouse")) k.SetValue("MouseSpeed", "0");
+            hvci = false;
+            Check(adviceIds().SequenceEqual(new[] { "background-recording" }),
+                  "Windows 10, agendamento de GPU ligado, precisão do ponteiro desligada e HVCI desligada: só sobra a gravação");
+        }
+
         var real = Stopwatch.StartNew();
         var onThisPc = GameScanner.Scan(GameContext.System());
         Perf("Verificar ajustes de jogos (registro real, só leitura)", real, onThisPc.Count + " itens: " + string.Join(", ", onThisPc.Select(f => f.Id)));
