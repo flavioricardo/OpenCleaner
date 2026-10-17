@@ -16,7 +16,7 @@ gerencia a inicialização, sem telemetria, sem anúncios e sem versão paga.
 [![Licença MIT](https://img.shields.io/github/license/flavioricardo/OpenCleaner?label=licen%C3%A7a)](LICENSE)
 ![Windows 10 e 11](https://img.shields.io/badge/Windows-10%20%7C%2011-3A414B)
 
-### [⬇ Baixar o instalador](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-Setup.exe) · [Versão portátil (.zip)](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-portable.zip) · [Todas as versões](https://github.com/flavioricardo/OpenCleaner/releases)
+### [Baixar o instalador](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-Setup.exe) · [Versão portátil](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-portable.zip) · [Todas as versões](https://github.com/flavioricardo/OpenCleaner/releases)
 
 <img src="docs/screenshots/pt-BR/verificacao-de-saude.png" width="820" alt="Verificação de saúde do OpenCleaner com o medidor de espaço em disco">
 

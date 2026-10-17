@@ -16,7 +16,7 @@ manages startup, with no telemetry, no ads and no paid tier.
 [![MIT license](https://img.shields.io/github/license/flavioricardo/OpenCleaner?label=license)](LICENSE)
 ![Windows 10 and 11](https://img.shields.io/badge/Windows-10%20%7C%2011-3A414B)
 
-### [⬇ Download the installer](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-Setup.exe) · [Portable version (.zip)](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-portable.zip) · [All releases](https://github.com/flavioricardo/OpenCleaner/releases)
+### [Download the installer](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-Setup.exe) · [Portable version](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-portable.zip) · [All releases](https://github.com/flavioricardo/OpenCleaner/releases)
 
 <img src="docs/screenshots/en/health-check.png" width="820" alt="OpenCleaner health check with the disk space meter">
 
