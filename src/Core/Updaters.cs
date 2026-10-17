@@ -120,6 +120,7 @@ namespace OpenCleaner.Core
                     };
                     // Linhas de rodapé ("15 atualizações disponíveis.") não têm ID válido.
                     if (pkg.Id.Length == 0 || pkg.Id.Contains(' ') || pkg.Available.Length == 0) break;
+                    if (!SafeId(pkg.Id)) continue; // um ID estranho nunca vai para a linha de comando
                     list.Add(pkg);
                 }
                 table++;
@@ -127,9 +128,16 @@ namespace OpenCleaner.Core
             return list;
         }
 
+        /// <summary>IDs do winget são do tipo Fornecedor.Programa: só letras, números e . _ - +.</summary>
+        public static bool SafeId(string id)
+        {
+            return System.Text.RegularExpressions.Regex.IsMatch(id ?? "", @"^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$");
+        }
+
         /// <summary>Atualiza um pacote. Retorna true se o winget terminou com sucesso.</summary>
         public static bool Upgrade(PackageUpdate pkg, Action<string> progress, out string message)
         {
+            if (!SafeId(pkg.Id)) { message = "invalid id"; return false; }
             string output;
             int code = Run("upgrade --id \"" + pkg.Id + "\" --exact --silent --accept-package-agreements" + Common,
                            out output, 30 * 60 * 1000, progress);

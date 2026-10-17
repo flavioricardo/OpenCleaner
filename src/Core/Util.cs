@@ -87,11 +87,53 @@ namespace OpenCleaner.Core
             return result;
         }
 
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        static extern uint GetLongPathName(string shortPath, System.Text.StringBuilder longPath, uint size);
+
+        /// <summary>
+        /// Forma canônica de um caminho existente: resolve "." e "..", barras duplicadas, ponto final
+        /// e nomes curtos 8.3 (C:\PROGRA~1). Sem isso, "%Temp%\..\..\..", "C:\Windows\\System32" ou
+        /// "C:\PROGRA~1" escapariam da lista de pastas protegidas por não serem iguais como texto.
+        /// </summary>
+        public static string Canonical(string p)
+        {
+            try
+            {
+                // Prefixos de caminho bruto: \\?\C:\Windows e \\.\C:\Windows são C:\Windows.
+                if (p.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase)) p = @"\\" + p.Substring(8);
+                else if (p.StartsWith(@"\\?\") || p.StartsWith(@"\\.\")) p = p.Substring(4);
+                string full = Path.GetFullPath(p);
+                var sb = new System.Text.StringBuilder(1024);
+                uint n = GetLongPathName(full, sb, (uint)sb.Capacity);
+                if (n > 0 && n < sb.Capacity) full = sb.ToString();
+                full = full.TrimEnd('\\');
+                if (full.Length == 2 && full[1] == ':') full += "\\";
+                return full;
+            }
+            catch { return p; }
+        }
+
         static string NormalizeDir(string p)
         {
             p = p.TrimEnd('\\');
             if (p.Length == 2 && p[1] == ':') p += "\\";
+            if (p.IndexOfAny(Wild) < 0) return Canonical(p);
+            // Com curinga: resolve "." e ".." no texto; o resultado final passa por Canonical em ResolveDirs.
+            p = string.Join("\\", ResolveDots(p.Split(new[] { '\\' }, StringSplitOptions.RemoveEmptyEntries)));
+            if (p.Length == 2 && p[1] == ':') p += "\\";
             return p;
+        }
+
+        static IEnumerable<string> ResolveDots(string[] parts)
+        {
+            var stack = new List<string>();
+            foreach (var part in parts)
+            {
+                if (part == ".") continue;
+                if (part == "..") { if (stack.Count > 1) stack.RemoveAt(stack.Count - 1); continue; }
+                stack.Add(part);
+            }
+            return stack;
         }
 
         /// <summary>Resolve variáveis e curingas em segmentos de pasta (ex.: User Data\*\Cache).</summary>
@@ -131,7 +173,7 @@ namespace OpenCleaner.Core
                     }
                     current = next;
                 }
-                result.AddRange(current);
+                result.AddRange(current.Select(Canonical));
             }
             return result.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
@@ -329,13 +371,52 @@ namespace OpenCleaner.Core
                     foreach (var p in ExpandVars("%" + v + "%")) set.Add(p.TrimEnd('\\'));
                 set.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32"));
                 set.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "SysWOW64"));
-                string users = Path.GetDirectoryName(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+                string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                string users = Path.GetDirectoryName(profile);
                 if (users != null) set.Add(users.TrimEnd('\\'));
+                // Pastas de conteúdo do usuário e sincronizadas na nuvem.
+                foreach (var name in new[] { "Downloads", "OneDrive", "Favorites", "Links", "Contacts", "Saved Games", "Searches", "3D Objects", "Videos", "source" })
+                    set.Add(Path.Combine(profile, name));
+                foreach (var env in new[] { "OneDrive", "OneDriveConsumer", "OneDriveCommercial" })
+                {
+                    string p = Environment.GetEnvironmentVariable(env);
+                    if (!string.IsNullOrEmpty(p)) set.Add(p.TrimEnd('\\'));
+                }
+                foreach (var f in new[] { Environment.SpecialFolder.Favorites, Environment.SpecialFolder.CommonDocuments,
+                                          Environment.SpecialFolder.StartMenu, Environment.SpecialFolder.CommonStartMenu })
+                {
+                    string p = Environment.GetFolderPath(f);
+                    if (!string.IsNullOrEmpty(p)) set.Add(p.TrimEnd('\\'));
+                }
+                // Os backups do registro do próprio OpenCleaner.
+                set.Add(AppSettings.DataDir);
                 protectedDirs = set;
             }
-            string d = dir.TrimEnd('\\');
+            string d = Canonical(dir).TrimEnd('\\');
             if (d.Length <= 2) return true; // raiz de unidade
             return protectedDirs.Contains(d);
+        }
+
+        /// <summary>
+        /// Recusa alvos amplos demais para uma regra, mesmo vinda de um winapp2.ini malicioso ou mal escrito:
+        /// pastas protegidas; "tudo" dentro de uma pasta logo abaixo do perfil (Downloads, OneDrive, projetos)
+        /// ou logo abaixo da raiz da unidade (C:\Intel, D:\Fotos); e curingas logo abaixo de uma pasta
+        /// protegida (%AppData%\* pegaria a pasta de todos os programas).
+        /// </summary>
+        public static bool IsTooBroad(string dir, bool recurse, bool matchAll, bool fromWildcard, bool userChosen = false)
+        {
+            dir = Canonical(dir);
+            if ((recurse || matchAll) && IsProtectedDir(dir)) return true;
+            if (!matchAll || userChosen) return false;
+            string d = dir.TrimEnd('\\');
+            string parent = Path.GetDirectoryName(d);
+            if (parent == null) return true;
+            string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile).TrimEnd('\\');
+            if (parent.TrimEnd('\\').Equals(profile, StringComparison.OrdinalIgnoreCase)) return true;
+            string name = Path.GetFileName(d).ToLowerInvariant();
+            if (parent.TrimEnd('\\').Length <= 2 && name != "temp" && name != "tmp") return true;
+            if (recurse && fromWildcard && IsProtectedDir(parent)) return true;
+            return false;
         }
     }
 }

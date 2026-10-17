@@ -317,6 +317,7 @@ namespace OpenCleaner.Core
 
     class DuplicateFinder
     {
+        const int CloudRecallOnOpen = 0x40000, CloudRecallOnDataAccess = 0x400000;
         public volatile bool Cancel;
         public string Status = "";
         public long MinSize = 1024;
@@ -340,6 +341,8 @@ namespace OpenCleaner.Core
                     {
                         if (fi.Length < MinSize) continue;
                         if (SkipHidden && (fi.Attributes & (FileAttributes.Hidden | FileAttributes.System)) != 0) continue;
+                        // Arquivos só na nuvem (OneDrive etc.): calcular o hash baixaria o arquivo inteiro.
+                        if (((int)fi.Attributes & (CloudRecallOnOpen | CloudRecallOnDataAccess | (int)FileAttributes.Offline)) != 0) continue;
                         List<FileEntry> l;
                         if (!bySize.TryGetValue(fi.Length, out l)) bySize[fi.Length] = l = new List<FileEntry>();
                         l.Add(new FileEntry { Path = fi.FullName, Size = fi.Length, Modified = fi.LastWriteTime });

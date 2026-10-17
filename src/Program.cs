@@ -12,6 +12,8 @@ using OpenCleaner.Core;
 [assembly: AssemblyCopyright("OpenCleaner")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
+// P/Invoke só procura DLLs do sistema no System32 (não na pasta do executável).
+[assembly: System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
 
 namespace OpenCleaner
 {
@@ -20,6 +22,7 @@ namespace OpenCleaner
         [STAThread]
         static int Main(string[] args)
         {
+            Hardening.Apply();
             if (args.Any(a => a.Equals("/AUTO", StringComparison.OrdinalIgnoreCase)))
                 return AutoClean();
 

@@ -262,6 +262,7 @@ namespace OpenCleaner.Core
             {
                 foreach (var k in keys)
                 {
+                    if (k.Path.Contains("\"")) continue; // não monta argumentos do reg.exe com aspas vindas do registro
                     string viewArg = k.View == RegistryView.Registry32 ? " /reg:32" : k.View == RegistryView.Registry64 ? " /reg:64" : "";
                     var psi = new ProcessStartInfo("reg.exe", "export \"" + k.Path + "\" \"" + tmp + "\" /y" + viewArg)
                     {

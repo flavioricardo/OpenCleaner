@@ -14,7 +14,12 @@ namespace OpenCleaner.Core
         public CleanRule Rule;
         public List<string> Files = new List<string>();
         public List<long> Sizes = new List<long>();
+        public List<int> FileRoot = new List<int>();   // índice em Roots da pasta-base de cada arquivo
+        public List<string> Roots = new List<string>();
+        public List<bool> RootWasLink = new List<bool>(); // a pasta-base já era junção na análise (ex.: perfil movido)
         public List<string> Dirs = new List<string>();
+        public List<int> DirRoot = new List<int>();
+        public int Skipped;                              // ignorados por segurança na hora de limpar
         public List<RegKeySpec> Regs = new List<RegKeySpec>();
         public long Bytes;
         public int SpecialItems;
@@ -56,16 +61,20 @@ namespace OpenCleaner.Core
                 if (Cancel) break;
                 var patterns = fk.Patterns.Select(Util.WildcardToRegex).ToList();
                 bool matchAll = fk.Patterns.Any(p => p == "*.*" || p == "*");
+                bool fromWildcard = Path.GetFileName(fk.Path.TrimEnd('\\')).IndexOfAny(new[] { '*', '?' }) >= 0;
                 foreach (var dir in Util.ResolveDirs(fk.Path))
                 {
-                    if ((fk.Recurse || matchAll) && Util.IsProtectedDir(dir))
+                    if (Util.IsTooBroad(dir, fk.Recurse, matchAll, fromWildcard, rule.IsCustom))
                     {
                         r.Note = L.T("Pasta protegida ignorada: ", "Protected folder skipped: ") + dir;
                         continue;
                     }
                     if (IsExcluded(dir, null, excludes)) continue;
-                    Collect(dir, patterns, fk.Recurse, cutoff, excludes, r, seen);
-                    if (fk.RemoveSelf) CollectDirs(dir, r);
+                    r.Roots.Add(dir);
+                    r.RootWasLink.Add(Util.IsReparsePoint(dir));
+                    int root = r.Roots.Count - 1;
+                    Collect(dir, root, patterns, fk.Recurse, cutoff, excludes, r, seen);
+                    if (fk.RemoveSelf) CollectDirs(dir, root, r);
                 }
             }
 
@@ -88,7 +97,7 @@ namespace OpenCleaner.Core
             return false;
         }
 
-        void Collect(string root, List<Regex> patterns, bool recurse, DateTime? cutoff,
+        void Collect(string root, int rootIndex, List<Regex> patterns, bool recurse, DateTime? cutoff,
                      List<Exclusion> excludes, RuleResult r, HashSet<string> seen)
         {
             var stack = new Stack<string>();
@@ -110,6 +119,7 @@ namespace OpenCleaner.Core
                             if (cutoff.HasValue && fi.LastWriteTime > cutoff.Value) continue;
                             r.Files.Add(file);
                             r.Sizes.Add(fi.Length);
+                            r.FileRoot.Add(rootIndex);
                             r.Bytes += fi.Length;
                         }
                         catch { }
@@ -122,7 +132,7 @@ namespace OpenCleaner.Core
             }
         }
 
-        static void CollectDirs(string root, RuleResult r)
+        static void CollectDirs(string root, int rootIndex, RuleResult r)
         {
             var stack = new Stack<string>();
             stack.Push(root);
@@ -130,6 +140,7 @@ namespace OpenCleaner.Core
             {
                 string dir = stack.Pop();
                 r.Dirs.Add(dir);
+                r.DirRoot.Add(rootIndex);
                 try
                 {
                     foreach (var sub in Directory.EnumerateDirectories(dir))
@@ -139,28 +150,62 @@ namespace OpenCleaner.Core
             }
         }
 
+        /// <summary>
+        /// Confere, na hora de apagar, que nenhuma pasta entre o item e a pasta-base virou junção ou
+        /// link simbólico depois da análise. Sem isso, trocar uma subpasta do Temp por uma junção para
+        /// C:\Windows faria uma limpeza como administrador apagar arquivos do sistema.
+        /// </summary>
+        static bool PathStillSafe(string dir, string root, bool rootWasLink)
+        {
+            string current = dir.TrimEnd('\\');
+            string stop = root.TrimEnd('\\');
+            while (true)
+            {
+                bool atRoot = current.Length <= stop.Length;
+                if (Util.IsReparsePoint(current) && !(atRoot && rootWasLink)) return false;
+                if (atRoot) return current.Equals(stop, StringComparison.OrdinalIgnoreCase);
+                string parent = Path.GetDirectoryName(current);
+                if (parent == null) return false;
+                current = parent;
+            }
+        }
+
         public void Clean(RuleResult r)
         {
             for (int i = 0; i < r.Files.Count && !Cancel; i++)
             {
+                string path = r.Files[i];
                 try
                 {
-                    var fi = new FileInfo(r.Files[i]);
-                    if (!fi.Exists) continue;
-                    if ((fi.Attributes & FileAttributes.ReadOnly) != 0)
-                        fi.Attributes &= ~FileAttributes.ReadOnly;
-                    if (settings.SecureDelete) Overwrite(fi);
-                    fi.Delete();
+                    // Uma chamada só para "existe?" e "somente leitura?".
+                    FileAttributes attrs;
+                    try { attrs = File.GetAttributes(path); }
+                    catch (FileNotFoundException) { continue; }
+                    catch (DirectoryNotFoundException) { continue; }
+                    if (i < r.FileRoot.Count && !PathStillSafe(Path.GetDirectoryName(path), r.Roots[r.FileRoot[i]], r.RootWasLink[r.FileRoot[i]]))
+                    {
+                        r.Skipped++;
+                        continue;
+                    }
+                    if ((attrs & FileAttributes.ReadOnly) != 0) File.SetAttributes(path, attrs & ~FileAttributes.ReadOnly);
+                    if (settings.SecureDelete) Overwrite(new FileInfo(path));
+                    File.Delete(path);
                     r.Removed++;
                     r.Freed += r.Sizes[i];
                 }
                 catch { r.Failed++; }
             }
 
-            // Pastas mais profundas primeiro; só remove se ficaram vazias.
-            foreach (var d in r.Dirs.OrderByDescending(d => d.Length))
+            // Pastas mais profundas primeiro; só remove se ficaram vazias e continuam sendo pastas reais.
+            var dirs = r.Dirs.Select((d, i) => new { d, root = i < r.DirRoot.Count ? r.Roots[r.DirRoot[i]] : null, link = i < r.DirRoot.Count && r.RootWasLink[r.DirRoot[i]] })
+                             .OrderByDescending(x => x.d.Length);
+            foreach (var x in dirs)
             {
-                try { if (!Directory.EnumerateFileSystemEntries(d).Any()) Directory.Delete(d); }
+                try
+                {
+                    if (x.root != null && !PathStillSafe(x.d, x.root, x.link)) continue;
+                    if (!Directory.EnumerateFileSystemEntries(x.d).Any()) Directory.Delete(x.d);
+                }
                 catch { }
             }
 
@@ -173,11 +218,26 @@ namespace OpenCleaner.Core
             if (r.Rule.Special != null) CleanSpecial(r);
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        struct BY_HANDLE_FILE_INFORMATION
+        {
+            public uint Attributes;
+            public System.Runtime.InteropServices.ComTypes.FILETIME Created, Accessed, Written;
+            public uint VolumeSerial, SizeHigh, SizeLow, Links, IndexHigh, IndexLow;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool GetFileInformationByHandle(Microsoft.Win32.SafeHandles.SafeFileHandle h, out BY_HANDLE_FILE_INFORMATION info);
+
         static void Overwrite(FileInfo fi)
         {
             var buf = new byte[64 * 1024];
             using (var fs = new FileStream(fi.FullName, FileMode.Open, FileAccess.Write, FileShare.None))
             {
+                // Link físico: os mesmos dados têm outro nome em outro lugar (talvez um arquivo do
+                // sistema). Sobrescrever estragaria o original; só o nome deste link é apagado.
+                BY_HANDLE_FILE_INFORMATION info;
+                if (!GetFileInformationByHandle(fs.SafeFileHandle, out info) || info.Links > 1) return;
                 long left = fs.Length;
                 while (left > 0)
                 {

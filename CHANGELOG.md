@@ -3,6 +3,28 @@
 Todas as mudanças relevantes do OpenCleaner. O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/)
 e as versões seguem o [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [Não lançado]
+
+### Segurança
+
+- Antes de apagar cada arquivo, confere se alguma pasta entre ele e a pasta-base virou junção ou link
+  depois da análise (impede que uma limpeza como administrador apague arquivos do sistema).
+- Caminhos das regras passam a ser canônicos (`..`, `.`, barras duplicadas, ponto final, nomes 8.3 e
+  prefixos `\\?\`) antes de comparar com as pastas protegidas.
+- Recusa regras "apagar tudo" logo abaixo do perfil (Downloads, OneDrive, projetos), da raiz da unidade
+  ou de pastas protegidas (`%AppData%\*`); Downloads, OneDrive e os backups do próprio app viram protegidos.
+- Exclusão segura não sobrescreve arquivos com mais de um link físico.
+- O Localizador de duplicados ignora arquivos só na nuvem e offline, em vez de baixá-los.
+- App e instalador só carregam DLLs do System32 (proteção contra DLL plantada).
+- IDs do winget e chaves de registro são validados antes de virarem argumento de linha de comando.
+- `SECURITY.md` com o modelo de ameaças e como reportar vulnerabilidades.
+
+### Testes
+
+- `tests/run-real.ps1`: todas as regras executadas numa sandbox, ataques ao motor, registro, inicialização,
+  desinstalador, disco, duplicados, winget, drivers, `/AUTO`, robustez e desempenho.
+- `tests/run-installer-tests.ps1`: instalação, atualização com o app aberto, DLL plantada e desinstalação.
+
 ## [1.0.0] - 2026-10-17
 
 Primeira versão pública.

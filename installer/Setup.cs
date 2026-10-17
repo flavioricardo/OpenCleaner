@@ -14,9 +14,12 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 using Microsoft.Win32;
+
+[assembly: System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
 
 namespace OpenCleanerSetup
 {
@@ -33,6 +36,9 @@ namespace OpenCleanerSetup
 
         /// <summary>true = inglês, false = português.</summary>
         public static bool English;
+
+        [DllImport("kernel32.dll")]
+        static extern bool SetDefaultDllDirectories(uint flags);
 
         public static string T(string pt, string en) { return English ? en : pt; }
 
@@ -63,6 +69,8 @@ namespace OpenCleanerSetup
         [STAThread]
         static int Main(string[] args)
         {
+            // Instaladores costumam rodar da pasta Downloads: não carregar DLLs plantadas ao lado.
+            try { SetDefaultDllDirectories(0x800); } catch { }
             bool silent = args.Any(a => a.Equals("/S", StringComparison.OrdinalIgnoreCase));
             bool uninstall = args.Any(a => a.Equals("/uninstall", StringComparison.OrdinalIgnoreCase));
             string lang = args.Where(a => a.StartsWith("/LANG=", StringComparison.OrdinalIgnoreCase))

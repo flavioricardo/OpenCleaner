@@ -195,6 +195,8 @@ disk space, and the names of your Windows edition, processor and memory (shown i
 - In *Options > Never delete*, you can protect any folder from every rule.
 - Optional **secure deletion** overwrites each file with zeros before deleting it.
 
+The threat model, every defense and the known limitations are in [SECURITY.md](SECURITY.md).
+
 ## Command line and automatic cleaning
 
 | Command | Effect |
@@ -272,12 +274,26 @@ cd OpenCleaner
 powershell -ExecutionPolicy Bypass -File build.ps1                       # builds bin\OpenCleaner.exe
 powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1   # builds dist\ (installer, zip and SHA-256)
 powershell -ExecutionPolicy Bypass -File tests\run-smoke.ps1             # smoke test
+powershell -ExecutionPolicy Bypass -File tests\run-real.ps1              # real functional, security and performance tests
+powershell -ExecutionPolicy Bypass -File tests\run-installer-tests.ps1   # installs, updates and uninstalls for real
 ```
 
 The smoke test analyzes (without deleting) every detected rule, runs a real cleanup in a sandbox folder in
 `%TEMP%`, checks the winget parser, renders every icon, scans the registry read-only, checks that both
 languages keep the same rule IDs and saves screenshots of every screen in both languages. With `-Drivers`,
 it also queries Windows Update.
+
+`tests\run-real.ps1` runs every feature for real in a sandbox folder that mirrors each rule's locations,
+creates registry and startup entries named `OpenCleanerTest` (removed at the end), attacks the engine
+(junction swaps, hard links, malicious rules, planted DLLs) and measures performance on the real disk,
+read-only. `tests\run-installer-tests.ps1` installs, updates with the app open and uninstalls for real,
+keeping your settings.
+
+`testsun-real.ps1` runs every feature for real in a sandbox folder that mirrors each rule's locations,
+creates registry and startup entries named `OpenCleanerTest` (removed at the end), attacks the engine
+(junction swaps, hard links, malicious rules, planted DLLs) and measures performance on the real disk,
+read-only. `testsun-installer-tests.ps1` installs, updates with the app open and uninstalls for real,
+keeping your settings.
 
 ```
 src/Core/       engine: rules (winapp2 format), cleaning, registry, updaters, tools, settings, languages

@@ -196,6 +196,8 @@ consulta o Windows Update (Microsoft). O app não se atualiza sozinho nem inicia
 - Em *Opções > Nunca apagar*, você protege qualquer pasta de todas as regras.
 - Opcional: **exclusão segura**, que sobrescreve cada arquivo com zeros antes de apagar.
 
+O modelo de ameaças, cada defesa e as limitações conhecidas estão em [SECURITY.md](SECURITY.md#política-de-segurança).
+
 ## Linha de comando e limpeza automática
 
 | Comando | Efeito |
@@ -275,12 +277,26 @@ cd OpenCleaner
 powershell -ExecutionPolicy Bypass -File build.ps1                       # gera bin\OpenCleaner.exe
 powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1   # gera dist\ (instalador, zip e SHA-256)
 powershell -ExecutionPolicy Bypass -File tests\run-smoke.ps1             # teste de fumaça
+powershell -ExecutionPolicy Bypass -File tests\run-real.ps1              # testes reais: funcionais, de segurança e de desempenho
+powershell -ExecutionPolicy Bypass -File tests\run-installer-tests.ps1   # instala, atualiza e desinstala de verdade
 ```
 
 O teste de fumaça analisa (sem apagar) todas as regras detectadas, faz uma limpeza real numa pasta
 sandbox em `%TEMP%`, valida o parser do winget, desenha todos os ícones, varre o registro em modo
 leitura, confere que os dois idiomas mantêm os mesmos IDs de regra e salva capturas de cada tela nos
 dois idiomas. Com `-Drivers`, também consulta o Windows Update.
+
+O `tests\run-real.ps1` executa cada funcionalidade de verdade numa pasta sandbox que espelha os locais de
+cada regra, cria entradas de registro e de inicialização chamadas `OpenCleanerTest` (removidas no final),
+ataca o motor (troca por junção, links físicos, regras maliciosas, DLL plantada) e mede o desempenho no disco
+real, só lendo. O `tests\run-installer-tests.ps1` instala, atualiza com o app aberto e desinstala de verdade,
+preservando as suas configurações.
+
+O `testsun-real.ps1` executa cada funcionalidade de verdade numa pasta sandbox que espelha os locais de
+cada regra, cria entradas de registro e de inicialização chamadas `OpenCleanerTest` (removidas no final),
+ataca o motor (troca por junção, links físicos, regras maliciosas, DLL plantada) e mede o desempenho no disco
+real, só lendo. O `testsun-installer-tests.ps1` instala, atualiza com o app aberto e desinstala de verdade,
+preservando as suas configurações.
 
 ```
 src/Core/       motor: regras (formato winapp2), limpeza, registro, atualizadores, ferramentas, configurações

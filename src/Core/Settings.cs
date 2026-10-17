@@ -40,11 +40,17 @@ namespace OpenCleaner.Core
 
         public static AppSettings Load()
         {
-            var s = new AppSettings();
             MigrateFromFreeCleaner();
-            if (!File.Exists(FilePath)) return s;
+            return Load(FilePath);
+        }
+
+        /// <summary>Lê um arquivo de configurações; linhas inválidas são ignoradas.</summary>
+        public static AppSettings Load(string path)
+        {
+            var s = new AppSettings();
+            if (!File.Exists(path)) return s;
             string section = "";
-            foreach (var raw in File.ReadAllLines(FilePath, Encoding.UTF8))
+            foreach (var raw in File.ReadAllLines(path, Encoding.UTF8))
             {
                 string line = raw.Trim();
                 if (line.Length == 0 || line.StartsWith(";")) continue;
