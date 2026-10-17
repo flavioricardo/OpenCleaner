@@ -132,7 +132,8 @@ namespace OpenCleaner.UI
                 Resize += (s, e) => { Invalidate(); detail.Width = about.Width = Width - Theme.S(40); };
 
                 Controls.Add(new IconBox(icon, Theme.S(20), Theme.Verde) { Location = Theme.Pt(20, 20) });
-                Controls.Add(new Label { Text = title, Font = Theme.H2, Location = Theme.Pt(50, 20), AutoSize = true });
+                var heading = new Label { Text = title, Font = Theme.H2, Location = Theme.Pt(50, 20), Size = Theme.Sz(150, 28), AutoEllipsis = true };
+                Controls.Add(heading);
                 about = new Label { Text = description, ForeColor = Theme.Grafite, Location = Theme.Pt(20, 56), Size = Theme.Sz(200, 60) };
                 value = new Label { Font = Theme.Big, Location = Theme.Pt(17, 48), AutoSize = true, Visible = false };
                 detail = new Label { ForeColor = Theme.Grafite, Location = Theme.Pt(20, 96), Size = Theme.Sz(200, 22), Visible = false, AutoEllipsis = true };
@@ -141,6 +142,7 @@ namespace OpenCleaner.UI
                 action.Visible = false;
                 action.Click += (s, e) => onClick();
                 Controls.AddRange(new Control[] { about, value, detail, action });
+                Resize += (s, e) => heading.Width = Math.Max(Theme.S(40), Width - Theme.S(60));
             }
 
             public void ShowResult(string number, string text, bool showAction, bool alert = false)
@@ -167,7 +169,7 @@ namespace OpenCleaner.UI
         readonly SpaceMeter meter;
         readonly Label headline, headlineSub, verdict;
         readonly Button btnCheck, btnRecheck, btnClean;
-        readonly ResultCard registry, startup, updates;
+        readonly ResultCard registry, startup, updates, games;
         readonly FlowLayoutPanel cards;
         List<RuleResult> junkResults;
         DriveInfo drive;
@@ -221,12 +223,15 @@ namespace OpenCleaner.UI
                                      L.T("Gerenciar inicialização", "Manage startup"), () => Main.Navigate("startup"));
             updates = new ResultCard("refresh-cw", L.T("Atualizações", "Updates"), L.T("Programas instalados que têm versão mais nova disponível.", "Installed programs that have a newer version available."),
                                      L.T("Atualizar programas", "Update programs"), () => Main.Navigate("updates"));
-            updates.Margin = Padding.Empty;
-            cards.Controls.AddRange(new Control[] { registry, startup, updates });
+            games = new ResultCard("gamepad-2", L.T("Jogos", "Gaming"), L.T("Ajustes de otimizadores que atrapalham e jogos fora da placa de vídeo dedicada.", "Optimizer settings that get in the way and games not on the dedicated graphics card."),
+                                   L.T("Revisar em Jogos", "Review in Gaming"), () => Main.Navigate("games"));
+            cards.Controls.AddRange(new Control[] { registry, startup, updates, games });
+            games.Margin = Padding.Empty;
             cards.Resize += (s, e) =>
             {
-                int w = (cards.ClientSize.Width - Theme.S(32)) / 3;
-                foreach (Control c in cards.Controls) c.Width = Math.Max(Theme.S(180), w);
+                int n = cards.Controls.Count;
+                int w = (cards.ClientSize.Width - Theme.S(16) * (n - 1)) / n;
+                foreach (Control c in cards.Controls) c.Width = Math.Max(Theme.S(130), w);
             };
 
             var system = new Label { Dock = DockStyle.Bottom, Height = Theme.S(26), ForeColor = Theme.Grafite, Font = Theme.Small, Text = SystemSummary(), TextAlign = ContentAlignment.BottomLeft };
@@ -284,11 +289,11 @@ namespace OpenCleaner.UI
             busy = true;
             btnCheck.Enabled = btnRecheck.Enabled = false;
             btnClean.Visible = false;
-            registry.Busy(); startup.Busy(); updates.Busy();
+            registry.Busy(); startup.Busy(); updates.Busy(); games.Busy();
             var engine = new CleanerEngine(Main.Settings);
             var results = new List<RuleResult>();
             List<RegIssue> issues = null;
-            int startupOn = 0, startupTotal = 0;
+            int startupOn = 0, startupTotal = 0, gameFixes = 0, gamesOffGpu = 0;
             List<PackageUpdate> outdated = null;
             string wingetVersion;
 
@@ -305,6 +310,11 @@ namespace OpenCleaner.UI
                 var st = Startup.List();
                 startupOn = st.Count(e => e.Enabled);
                 startupTotal = st.Count;
+                Ui(() => verdict.Text = L.T("Verificando ajustes para jogos...", "Checking gaming settings..."));
+                gameFixes = GameScanner.Scan(GameContext.System()).Count;
+                if (GpuPreference.IsHybridLaptop(GpuPreference.Adapters(), Util.HasBattery()))
+                    gamesOffGpu = GameLibrary.Find(GameSources.System())
+                                             .Count(g => GpuPreference.StateOf(Registry.CurrentUser, g) != GpuPreference.HighPerformance);
                 if (Winget.IsAvailable(out wingetVersion))
                 {
                     Ui(() => verdict.Text = L.T("Procurando atualizações de programas...", "Looking for program updates..."));
@@ -334,9 +344,15 @@ namespace OpenCleaner.UI
                 }
 
                 registry.ShowResult(issues.Count.ToString(), issues.Count == 0 ? L.T("nenhuma entrada órfã", "no orphaned entries") : L.T("entradas órfãs para revisar", "orphaned entries to review"), issues.Count > 0, issues.Count > 0);
-                startup.ShowResult(startupOn.ToString(), L.T("de ", "of ") + startupTotal + L.T(" programas abrem com o Windows", " programs open with Windows"), startupTotal > 0, startupOn > 10);
+                startup.ShowResult(startupOn.ToString(), L.T("de ", "of ") + startupTotal + L.T(" abrem com o Windows", " open with Windows"), startupTotal > 0, startupOn > 10);
+                int gameTotal = gameFixes + gamesOffGpu;
+                string gameText = gameTotal == 0 ? L.T("tudo certo para jogar", "all set for gaming")
+                    : gamesOffGpu == 0 ? L.T("ajustes a desfazer", "settings to undo")
+                    : gameFixes == 0 ? L.T("jogos sem a placa dedicada", "games off the dedicated card")
+                    : L.F("{0} ajustes · {1} jogos", "{0} settings · {1} games", gameFixes, gamesOffGpu);
+                games.ShowResult(gameTotal.ToString(), gameText, true, gameTotal > 0);
                 if (outdated == null) updates.ShowResult("—", "winget não instalado", true);
-                else updates.ShowResult(outdated.Count.ToString(), outdated.Count == 0 ? L.T("tudo atualizado", "everything up to date") : L.T("com versão nova disponível", "with a newer version available"), outdated.Count > 0, outdated.Count > 0);
+                else updates.ShowResult(outdated.Count.ToString(), outdated.Count == 0 ? L.T("tudo atualizado", "everything up to date") : L.T("com versão nova disponível", "with a new version"), outdated.Count > 0, outdated.Count > 0);
             });
         }
 

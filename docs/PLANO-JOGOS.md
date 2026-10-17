@@ -1,7 +1,9 @@
 # Plano: menu Jogos
 
-Status: etapas 1 e 2 implementadas (`src/Core/Games.cs`, `GameLibrary.cs`, `GpuPreference.cs`) e cobertas
-por `tests/RealTests.cs`. Ainda sem interface.
+Status: etapas 1 a 3 implementadas. O núcleo está em `src/Core/Games.cs`, `GameLibrary.cs` e
+`GpuPreference.cs`; a interface, em `src/UI/GamesPage.cs`, no item "Jogos" da barra lateral e num 4º
+cartão na Verificação de saúde. Testes: `tests/RealTests.cs` e capturas em `tests/SmokeTest.cs`. Os quatro
+cartões ficam sempre numa linha: duas linhas não cabem na altura mínima da janela.
 
 Um menu novo, **Jogos**, que confere se o PC está bem configurado para jogar: desfaz o que
 "otimizadores" e "game boosters" quebraram, põe os jogos na placa de vídeo dedicada em notebooks com duas

@@ -48,6 +48,7 @@ namespace OpenCleaner.UI
                 { "home", () => new HomePage(this) },
                 { "clean", () => new CleanerPage(this) },
                 { "registry", () => new RegistryPage(this) },
+                { "games", () => new GamesPage(this) },
                 { "uninstall", () => new UninstallPage(this) },
                 { "startup", () => new StartupPage(this) },
                 { "disk", () => new DiskPage(this) },
@@ -92,6 +93,7 @@ namespace OpenCleaner.UI
             items.Controls.Add(nav("home", "heart-pulse", L.T("Verificação de saúde", "Health check")));
             items.Controls.Add(nav("clean", "brush-cleaning", L.T("Limpeza personalizada", "Custom clean")));
             items.Controls.Add(nav("registry", "database", L.T("Registro", "Registry")));
+            items.Controls.Add(nav("games", "gamepad-2", L.T("Jogos", "Gaming")));
             heading(L.T("Programas", "Programs"));
             items.Controls.Add(nav("updates", "refresh-cw", L.T("Atualizar programas", "Update programs")));
             items.Controls.Add(nav("drivers", "cpu", L.T("Atualizar drivers", "Update drivers")));

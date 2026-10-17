@@ -110,9 +110,15 @@ namespace OpenCleaner.Core
             catch { return null; }
         }
 
+        /// <summary>Nome da raiz em forma curta (HKCU, HKLM); numa sandbox de teste, o caminho dela continua depois.</summary>
+        static string Short(RegistryKey root)
+        {
+            return root.Name.Replace("HKEY_CURRENT_USER", "HKCU").Replace("HKEY_LOCAL_MACHINE", "HKLM");
+        }
+
         static string Where(RegistryKey root, string key, string name)
         {
-            return root.Name + "\\" + key + "  [" + name + "]";
+            return Short(root) + "\\" + key + "  [" + name + "]";
         }
 
         static void GameMode(GameContext c, List<GameFinding> found)
@@ -128,7 +134,7 @@ namespace OpenCleaner.Core
                           "Game Mode gives the game priority and keeps Windows Update from installing drivers or asking to restart while you play. Optimizers such as Nich FPS+ turn it off, the opposite of what they promise."),
                 Location = Where(c.Hkcu, GameBar, off ? "AutoGameModeEnabled" : "AllowAutoGameMode"),
                 Current = L.T("desligado", "off"),
-                Expected = L.T("ligado (padrão do Windows)", "on (Windows default)")
+                Expected = L.T("ligado", "on")
             };
             f.Edits.Add(new RegEdit { Root = c.Hkcu, Key = GameBar, Name = "AutoGameModeEnabled", Value = 1 });
             if (blocked) f.Edits.Add(new RegEdit { Root = c.Hkcu, Key = GameBar, Name = "AllowAutoGameMode" });
@@ -146,7 +152,7 @@ namespace OpenCleaner.Core
                           "A company policy keeps the Game Bar from recording and makes Settings say some options are managed by your organization. On a home PC, an optimizer put it there. Without it, you choose again in Settings whether to record."),
                 Location = Where(c.Hklm, GameDvrPolicy, "AllowGameDVR"),
                 Current = L.T("bloqueada por política", "blocked by policy"),
-                Expected = L.T("sem política (padrão do Windows)", "no policy (Windows default)"),
+                Expected = L.T("sem política", "no policy"),
                 NeedsAdmin = true
             };
             f.Edits.Add(new RegEdit { Root = c.Hklm, Key = GameDvrPolicy, Name = "AllowGameDVR" });
@@ -166,7 +172,7 @@ namespace OpenCleaner.Core
                     Why = L.T(why, whyEn),
                     Location = Where(c.Hkcu, BackgroundApps, "GlobalUserDisabled"),
                     Current = L.T("desligado para todos", "off for all"),
-                    Expected = L.T("cada app decide (padrão do Windows)", "each app decides (Windows default)")
+                    Expected = L.T("cada app decide", "each app decides")
                 };
                 f.Edits.Add(new RegEdit { Root = c.Hkcu, Key = BackgroundApps, Name = "GlobalUserDisabled" });
                 found.Add(f);
@@ -180,7 +186,7 @@ namespace OpenCleaner.Core
                     Why = L.T(why, whyEn),
                     Location = Where(c.Hklm, AppPrivacyPolicy, "LetAppsRunInBackground"),
                     Current = L.T("proibido por política", "barred by policy"),
-                    Expected = L.T("sem política (padrão do Windows)", "no policy (Windows default)"),
+                    Expected = L.T("sem política", "no policy"),
                     NeedsAdmin = true
                 };
                 f.Edits.Add(new RegEdit { Root = c.Hklm, Key = AppPrivacyPolicy, Name = "LetAppsRunInBackground" });
@@ -212,9 +218,9 @@ namespace OpenCleaner.Core
                 Name = L.F("{0} de {1} apps desligados em segundo plano, um por um", "{0} of {1} apps turned off in the background, one by one", disabled, apps),
                 Why = L.T(why, whyEn) + L.T(" Desligar quase todos de uma vez é a marca de um otimizador. Se foi você quem escolheu, deixe este item desmarcado.",
                                             " Turning almost all of them off at once is an optimizer's signature. If you chose this yourself, leave this item unchecked."),
-                Location = c.Hkcu.Name + "\\" + BackgroundApps + "\\*  [Disabled, DisabledByUser]",
+                Location = Short(c.Hkcu) + "\\" + BackgroundApps + "\\*  [Disabled, DisabledByUser]",
                 Current = L.F("{0} desligados", "{0} off", disabled),
-                Expected = L.T("cada app decide (padrão do Windows)", "each app decides (Windows default)"),
+                Expected = L.T("cada app decide", "each app decides"),
                 DefaultChecked = false
             };
             b.Edits.AddRange(bulk);
@@ -247,9 +253,9 @@ namespace OpenCleaner.Core
                 Name = L.F("Plano de energia \"{0}\" ativo num notebook", "\"{0}\" power plan active on a laptop", friendly),
                 Why = L.T("É uma cópia do Desempenho Máximo, feito para PCs de mesa. Num notebook, ele mantém o processador acelerado o tempo todo: mais calor, menos bateria e, com o calor, o processador reduz a velocidade justamente durante o jogo. O plano Equilibrado já acelera quando o jogo pede. O plano copiado continua na lista, e dá para voltar a ele em Opções de Energia.",
                           "It is a copy of Ultimate Performance, made for desktops. On a laptop it keeps the processor boosted all the time: more heat, less battery and, because of the heat, the processor slows down right when you are playing. The Balanced plan already boosts when the game needs it. The copied plan stays in the list, and you can switch back to it in Power Options."),
-                Location = c.Hklm.Name + "\\" + PowerSchemes + "  [ActivePowerScheme = " + active + "]",
+                Location = Short(c.Hklm) + "\\" + PowerSchemes + "  [ActivePowerScheme = " + active + "]",
                 Current = friendly,
-                Expected = L.T("Equilibrado (padrão do Windows)", "Balanced (Windows default)"),
+                Expected = L.T("Equilibrado", "Balanced"),
                 Run = () => c.SetActivePowerScheme(Balanced)
             };
             found.Add(f);
@@ -257,12 +263,17 @@ namespace OpenCleaner.Core
 
         // ---- Backup e conserto ----
 
+        /// <summary>Chaves que os consertos vão alterar, no formato do Util.ExportRegistry.</summary>
+        public static IEnumerable<KeyValuePair<string, RegistryView>> BackupKeys(IEnumerable<GameFinding> findings)
+        {
+            return findings.SelectMany(f => f.Edits)
+                           .Select(e => new KeyValuePair<string, RegistryView>(e.Root.Name + "\\" + e.Key, e.Root.View));
+        }
+
         /// <summary>Exporta para um .reg as chaves que os consertos vão alterar.</summary>
         public static bool Backup(IEnumerable<GameFinding> findings, string target, out string error)
         {
-            var keys = findings.SelectMany(f => f.Edits)
-                               .Select(e => new KeyValuePair<string, RegistryView>(e.Root.Name + "\\" + e.Key, e.Root.View));
-            return Util.ExportRegistry(keys, target, out error);
+            return Util.ExportRegistry(BackupKeys(findings), target, out error);
         }
 
         public static bool Fix(GameFinding f)

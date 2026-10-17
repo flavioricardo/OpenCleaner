@@ -81,6 +81,25 @@ namespace OpenCleaner.Core
             catch { return WindowsDecides; }
         }
 
+        /// <summary>Estado do jogo: economia de energia se algum .exe estiver nela; senão, Windows decide se algum estiver; senão, alto desempenho.</summary>
+        public static int StateOf(RegistryKey hkcu, InstalledGame game)
+        {
+            var states = game.Exes.Select(e => Get(hkcu, e)).ToList();
+            if (states.Contains(PowerSaving)) return PowerSaving;
+            if (states.Any(s => s != HighPerformance)) return WindowsDecides;
+            return HighPerformance;
+        }
+
+        public static string Label(int pref)
+        {
+            switch (pref)
+            {
+                case PowerSaving: return L.T("Economia de energia", "Power saving");
+                case HighPerformance: return L.T("Alto desempenho", "High performance");
+                default: return L.T("Windows decide", "Let Windows decide");
+            }
+        }
+
         public static bool Set(RegistryKey hkcu, string exe, int pref)
         {
             try

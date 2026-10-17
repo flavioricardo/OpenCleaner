@@ -248,10 +248,10 @@ static class SmokeTest
         };
         Check(form.Height <= Screen.PrimaryScreen.WorkingArea.Height, "janela cabe na área útil da tela");
 
-        foreach (var page in new[] { "home", "clean", "registry", "updates", "drivers", "uninstall", "startup", "disk", "dupes", "options" })
+        foreach (var page in new[] { "home", "clean", "registry", "games", "updates", "drivers", "uninstall", "startup", "disk", "dupes", "options" })
         {
             form.Navigate(page);
-            pump(page == "updates" ? 25 : page == "clean" || page == "uninstall" ? 6 : 1.5);
+            pump(page == "updates" ? 25 : page == "clean" || page == "uninstall" ? 6 : page == "games" ? 3 : 1.5);
             shot(page);
             foreach (var lv in AllLists(form).Where(l => l.Visible && l.Items.Count > 0))
             {
@@ -274,6 +274,31 @@ static class SmokeTest
             Check(done, page + ": \"" + button + "\" terminou");
             shot(page + (L.English ? "-en" : "") + "-result");
         };
+        // Jogos com um jogo de teste (entrada OpenCleanerTest no registro de jogos do Windows, removida no final).
+        // O grupo de GPU só aparece em notebook com duas placas.
+        string fakeGame = Path.Combine(outDir, @"jogo\OpenCleanerTestJogo.exe");
+        const string fakeKey = @"System\GameConfigStore\Children\OpenCleanerTestJogo";
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(fakeGame));
+            File.WriteAllBytes(fakeGame, new byte[] { 0x4D, 0x5A });
+            using (var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(fakeKey)) k.SetValue("MatchedExeFullPath", fakeGame);
+            form.Navigate("games");
+            var again = FindButton(form, "Verificar de novo");
+            if (again != null) again.PerformClick();
+            pump(3);
+            var gameItem = AllLists(form).SelectMany(l => l.Items.Cast<ListViewItem>()).FirstOrDefault(i => i.Tag is InstalledGame);
+            bool hybrid = GpuPreference.IsHybridLaptop(GpuPreference.Adapters(), Util.HasBattery());
+            Check(hybrid == (gameItem != null), "jogos: grupo de GPU aparece só em notebook com duas placas (" + (hybrid ? "híbrido" : "não híbrido") + ")");
+            if (gameItem != null) { gameItem.Selected = true; gameItem.EnsureVisible(); pump(0.5); }
+            shot("games-gpu");
+        }
+        finally
+        {
+            try { Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(fakeKey, false); } catch { }
+            try { using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(GpuPreference.Key, true)) if (k != null) k.DeleteValue(fakeGame, false); } catch { }
+        }
+
         run("home", "Verificar agora", "Verificar de novo", 120);
         run("clean", "Analisar", null, 120);
         run("registry", "Procurar problemas", null, 60);
@@ -284,10 +309,10 @@ static class SmokeTest
         form.StartPosition = FormStartPosition.Manual;
         form.Location = new Point(-3000, 0);
         form.Show();
-        foreach (var page in new[] { "home", "clean", "registry", "updates", "drivers", "uninstall", "startup", "disk", "dupes", "options" })
+        foreach (var page in new[] { "home", "clean", "registry", "games", "updates", "drivers", "uninstall", "startup", "disk", "dupes", "options" })
         {
             form.Navigate(page);
-            pump(page == "updates" ? 25 : page == "clean" || page == "uninstall" ? 6 : 1.5);
+            pump(page == "updates" ? 25 : page == "clean" || page == "uninstall" ? 6 : page == "games" ? 3 : 1.5);
             shot(page + "-en");
         }
         run("home", "Check now", "Check again", 120);
