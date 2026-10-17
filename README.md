@@ -1,353 +1,330 @@
 <div align="center">
 
-<img src="assets/OpenCleaner.png" width="96" alt="Ícone do OpenCleaner">
+**English** · [Português (Brasil)](README.pt-BR.md)
+
+<img src="assets/OpenCleaner.png" width="96" alt="OpenCleaner icon">
 
 # OpenCleaner
 
-**Limpador de PC gratuito e de código aberto para Windows.**
-Libera espaço em disco, limpa navegadores, corrige o registro, atualiza programas e drivers e
-gerencia a inicialização, sem telemetria, sem anúncios e sem versão paga.
+**Free and open-source PC cleaner for Windows.**
+Frees up disk space, cleans browsers, fixes the registry, updates programs and drivers and
+manages startup, with no telemetry, no ads and no paid tier.
 
-[![Última versão](https://img.shields.io/github/v/release/flavioricardo/OpenCleaner?label=vers%C3%A3o&color=0E7C66)](https://github.com/flavioricardo/OpenCleaner/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/flavioricardo/OpenCleaner?label=release&color=0E7C66)](https://github.com/flavioricardo/OpenCleaner/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/flavioricardo/OpenCleaner/total?label=downloads&color=0E7C66)](https://github.com/flavioricardo/OpenCleaner/releases)
 [![Build](https://github.com/flavioricardo/OpenCleaner/actions/workflows/build.yml/badge.svg)](https://github.com/flavioricardo/OpenCleaner/actions/workflows/build.yml)
-[![Licença MIT](https://img.shields.io/github/license/flavioricardo/OpenCleaner?label=licen%C3%A7a)](LICENSE)
-![Windows 10 e 11](https://img.shields.io/badge/Windows-10%20%7C%2011-3A414B)
+[![MIT license](https://img.shields.io/github/license/flavioricardo/OpenCleaner?label=license)](LICENSE)
+![Windows 10 and 11](https://img.shields.io/badge/Windows-10%20%7C%2011-3A414B)
 
-### [⬇ Baixar o instalador](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-Setup.exe) · [Versão portátil (.zip)](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-portable.zip) · [Todas as versões](https://github.com/flavioricardo/OpenCleaner/releases)
+### [⬇ Download the installer](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-Setup.exe) · [Portable version (.zip)](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-portable.zip) · [All releases](https://github.com/flavioricardo/OpenCleaner/releases)
 
-<img src="docs/screenshots/verificacao-de-saude.png" width="820" alt="Verificação de saúde do OpenCleaner com o medidor de espaço em disco">
+<img src="docs/screenshots/en/health-check.png" width="820" alt="OpenCleaner health check with the disk space meter">
 
-[English summary](#english) · [Recursos](#o-que-o-opencleaner-faz) · [Permissões](#permissões-e-privacidade) · [Perguntas frequentes](#perguntas-frequentes)
+[Features](#what-opencleaner-does) · [Permissions](#permissions-and-privacy) · [FAQ](#frequently-asked-questions)
 
 </div>
 
 ---
 
-## Sumário
+## Contents
 
-- [Por que o OpenCleaner](#por-que-o-opencleaner)
-- [Baixar e instalar](#baixar-e-instalar)
-- [O que o OpenCleaner faz](#o-que-o-opencleaner-faz)
-- [O que cada ação altera](#o-que-cada-ação-altera)
-- [Permissões e privacidade](#permissões-e-privacidade)
-- [Proteções contra estragos](#proteções-contra-estragos)
-- [Linha de comando e limpeza automática](#linha-de-comando-e-limpeza-automática)
-- [Perguntas frequentes](#perguntas-frequentes)
-- [Inspirações e créditos](#inspirações-e-créditos)
-- [Compilar a partir do código](#compilar-a-partir-do-código)
-- [Contribuir](#contribuir)
-- [Licença](#licença)
-- [English](#english)
+- [Why OpenCleaner](#why-opencleaner)
+- [Download and install](#download-and-install)
+- [What OpenCleaner does](#what-opencleaner-does)
+- [What each action changes](#what-each-action-changes)
+- [Permissions and privacy](#permissions-and-privacy)
+- [Safeguards](#safeguards)
+- [Command line and automatic cleaning](#command-line-and-automatic-cleaning)
+- [Frequently asked questions](#frequently-asked-questions)
+- [Inspiration and credits](#inspiration-and-credits)
+- [Build from source](#build-from-source)
+- [Contributing](#contributing)
+- [License](#license)
 
-## Por que o OpenCleaner
+## Why OpenCleaner
 
-Limpadores de PC populares viraram vitrines de assinatura: avisos de "problemas encontrados" para
-vender a versão paga, telemetria ligada por padrão, ofertas de outros produtos durante a instalação.
-O OpenCleaner faz o trabalho de um limpador de sistema completo e para por aí:
+Popular PC cleaners have turned into subscription storefronts: "issues found" alerts to sell the paid
+version, telemetry on by default, offers for other products during setup. OpenCleaner does the job of
+a complete system cleaner and stops there:
 
-- **Gratuito de verdade**: nenhum recurso bloqueado, nenhuma assinatura.
-- **Em português e em inglês**: o app e o instalador seguem o idioma do Windows, e dá para trocar a qualquer momento.
-- **Sem telemetria**: o app não envia nada sobre você nem sobre o seu PC.
-- **Transparente**: o código está aqui, e cada item de limpeza mostra exatamente quais arquivos sairão.
-- **Leve**: um único executável de cerca de 230 KB, sem serviço em segundo plano e sem iniciar com o Windows.
-- **Cuidadoso**: analisar nunca apaga nada; o que é destrutivo pede confirmação; senhas e cookies vêm desmarcados.
+- **Actually free**: no locked features, no subscription.
+- **English and Portuguese**: the app and the installer follow the Windows language, and you can switch at any time.
+- **No telemetry**: the app sends nothing about you or your PC.
+- **Transparent**: the code is right here, and every cleaning item shows exactly which files will go.
+- **Lightweight**: a single executable of about 230 KB, with no background service and no startup entry.
+- **Careful**: analyzing never deletes anything; destructive actions ask for confirmation; passwords and cookies start unchecked.
 
-## Baixar e instalar
+## Download and install
 
-| Arquivo | Para quem |
+| File | Who it's for |
 |---|---|
-| **[OpenCleaner-Setup.exe](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-Setup.exe)** | Recomendado. Instala só para o seu usuário, **sem pedir permissão de administrador**, com atalho no menu Iniciar e desinstalação em *Configurações > Apps*. |
-| [OpenCleaner-portable.zip](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-portable.zip) | Portátil: extraia e abra o `OpenCleaner.exe`. Bom para pendrive ou para testar sem instalar. |
+| **[OpenCleaner-Setup.exe](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-Setup.exe)** | Recommended. Installs for your user only, **without asking for administrator permission**, with a Start menu shortcut and uninstall from *Settings > Apps*. |
+| [OpenCleaner-portable.zip](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-portable.zip) | Portable: extract it and open `OpenCleaner.exe`. Good for a USB drive or for trying it without installing. |
 
-**Requisitos:** Windows 10 ou Windows 11, 32 ou 64 bits. O .NET Framework 4.x necessário já vem
-com o Windows. O atualizador de programas usa o [winget](https://learn.microsoft.com/windows/package-manager/winget/)
-(já incluído no Windows 11 e nas versões atuais do Windows 10).
+**Requirements:** Windows 10 or Windows 11, 32 or 64-bit. The .NET Framework 4.x it needs already ships
+with Windows. The program updater uses [winget](https://learn.microsoft.com/windows/package-manager/winget/)
+(included in Windows 11 and in current versions of Windows 10).
 
-**"O Windows protegeu o computador":** o instalador ainda não tem assinatura digital paga, então o
-SmartScreen pode avisar na primeira execução. Clique em **Mais informações** > **Executar assim mesmo**.
-Para conferir que o arquivo é o publicado aqui, compare o SHA-256 com o `SHA256SUMS.txt` da release:
+**"Windows protected your PC":** the installer doesn't have a paid code-signing certificate yet, so
+SmartScreen may warn you the first time. Click **More info** > **Run anyway**. To check that the file is
+the one published here, compare its SHA-256 with the release's `SHA256SUMS.txt`:
 
 ```powershell
 Get-FileHash .\OpenCleaner-Setup.exe -Algorithm SHA256
 ```
 
-**Onde ele fica instalado:** `%LocalAppData%\Programs\OpenCleaner`. Para instalar sem janela (por
-exemplo, em vários PCs), use `OpenCleaner-Setup.exe /S` (com `/LANG=pt` ou `/LANG=en` para escolher o idioma).
+**Where it's installed:** `%LocalAppData%\Programs\OpenCleaner`. For a silent install (for example, on
+several PCs), use `OpenCleaner-Setup.exe /S` (add `/LANG=en` or `/LANG=pt` to pick the language).
 
-**Idioma:** o instalador abre no idioma do Windows e tem um seletor *Português / English* no canto da
-janela. A escolha vale também para o app e para o desinstalador. Depois, troque em *Opções > Idioma · Language*.
+**Language:** the installer opens in the Windows language and has a *Português / English* selector in the
+corner of the window. The choice also applies to the app and the uninstaller. Later, change it in
+*Options > Idioma · Language*.
 
-**Desinstalar:** *Configurações > Apps > OpenCleaner > Desinstalar*. O desinstalador pergunta se
-você quer manter suas configurações e os backups do registro.
+**Uninstall:** *Settings > Apps > OpenCleaner > Uninstall*. The uninstaller asks whether you want to keep
+your settings and registry backups.
 
-## O que o OpenCleaner faz
+## What OpenCleaner does
 
-### Verificação de saúde
+### Health check
 
-Uma visão do PC numa tela: quanto do disco do sistema está usado, quanto **pode ser liberado**
-(o trecho hachurado do medidor), entradas órfãs no registro, programas que abrem com o Windows e
-programas com versão nova disponível. A verificação só lê; nada muda até você clicar em **Limpar**.
+Your PC on one screen: how much of the system drive is used, how much **can be freed** (the hatched part
+of the meter), orphaned registry entries, programs that open with Windows and programs with a newer
+version available. The check only reads; nothing changes until you click **Clean**.
 
-### Limpeza personalizada
+### Custom clean
 
-<img src="docs/screenshots/limpeza-personalizada.png" width="760" alt="Limpeza personalizada: árvore de itens e resultado da análise">
+<img src="docs/screenshots/en/custom-clean.png" width="760" alt="Custom clean: item tree and analysis results">
 
-Mais de 70 itens de limpeza agrupados em **Windows**, **Navegadores** e **Aplicativos**. Só aparecem
-os programas que estão instalados. Clique em **Analisar** para ver quanto espaço volta e, com dois
-cliques num resultado, a lista de arquivos; depois clique em **Executar limpeza**.
+More than 70 cleaning items grouped into **Windows**, **Browsers** and **Applications**. Only installed
+programs show up. Click **Analyze** to see how much space comes back and double-click a result to see its
+files; then click **Run cleaner**.
 
-| Grupo | O que limpa |
+| Group | What it cleans |
 |---|---|
-| Windows: Sistema | Lixeira, arquivos temporários (com a opção de manter os de menos de 24 h), despejos de memória, fragmentos do Chkdsk, logs do Windows e de rastreamento de eventos, Relatório de Erros do Windows, cache de DNS, Otimização de Entrega, downloads do Windows Update, Prefetch antigo, cache de shaders de GPU (DirectX, NVIDIA, AMD), logs de instalação de drivers, área de transferência |
-| Windows: Explorador | Cache de miniaturas, documentos recentes, histórico do Executar, outras listas de itens recentes, listas de atalhos da barra de tarefas |
-| Navegadores | **Google Chrome, Microsoft Edge, Brave, Vivaldi, Opera e Opera GX**: cache, histórico de navegação e downloads, cookies, sessão, formulários salvos e senhas salvas. **Mozilla Firefox**: cache, cookies, sessão, formulários salvos e relatórios de falha |
-| Aplicativos | Discord, Microsoft Teams (clássico e novo), Zoom, Spotify, Visual Studio Code, Steam, OneDrive, Java, Telegram Desktop, arquivos de instalação da NVIDIA, histórico do 7-Zip, Paint, Regedit e Área de Trabalho Remota |
-| Avançado | **Pastas personalizadas**: qualquer pasta que você indicar em *Opções* |
+| Windows: System | Recycle Bin, temporary files (with the option to keep files newer than 24 h), memory dumps, Chkdsk file fragments, Windows logs and event trace logs, Windows Error Reporting, DNS cache, Delivery Optimization, Windows Update downloads, old Prefetch data, GPU shader cache (DirectX, NVIDIA, AMD), driver installation logs, clipboard |
+| Windows: Explorer | Thumbnail cache, recent documents, Run history, other recent item lists, taskbar jump lists |
+| Browsers | **Google Chrome, Microsoft Edge, Brave, Vivaldi, Opera and Opera GX**: cache, browsing and download history, cookies, session, saved form data and saved passwords. **Mozilla Firefox**: cache, cookies, session, saved form data and crash reports |
+| Applications | Discord, Microsoft Teams (classic and new), Zoom, Spotify, Visual Studio Code, Steam, OneDrive, Java, Telegram Desktop, NVIDIA installation files, 7-Zip history, Paint, Regedit and Remote Desktop |
+| Advanced | **Custom folders**: any folder you set in *Options* |
 
-Com o arquivo **`winapp2.ini`** da comunidade (o mesmo formato aceito pelo CCleaner), o OpenCleaner
-ganha milhares de regras extras: salve-o em `%AppData%\OpenCleaner\` e ative em *Opções*.
+With the community **`winapp2.ini`** file (the same format CCleaner accepts), OpenCleaner gets thousands
+of extra rules: save it to `%AppData%\OpenCleaner\` and turn it on in *Options*.
 
-### Registro
+### Registry
 
-<img src="docs/screenshots/registro.png" width="760" alt="Limpador de registro do OpenCleaner">
+<img src="docs/screenshots/en/registry.png" width="760" alt="OpenCleaner registry cleaner">
 
-Encontra entradas que apontam para arquivos e programas que não existem mais, em sete categorias:
-DLLs compartilhadas ausentes, caminhos de programas, programas já removidos, inicialização sem
-arquivo, nomes de programas removidos, pastas de instaladores e fontes ausentes. Antes de corrigir,
-oferece um **backup `.reg`** para desfazer com dois cliques.
+Finds entries that point to files and programs that no longer exist, in seven categories: missing shared
+DLLs, program paths, programs already removed, startup without a file, names of removed programs,
+installer folders and missing fonts. Before fixing, it offers a **`.reg` backup** you can restore with a
+double-click.
 
-### Atualizar programas
+### Update programs
 
-Lista os programas instalados com versão mais nova e atualiza os marcados pelo **winget**, o
-gerenciador de pacotes oficial do Windows: o catálogo é mantido pela Microsoft e os instaladores
-são conferidos por hash antes de rodar.
+Lists installed programs with a newer version and updates the checked ones through **winget**, the
+official Windows package manager: Microsoft maintains the catalog and installers are hash-checked before
+they run.
 
-### Atualizar drivers
+### Update drivers
 
-<img src="docs/screenshots/atualizar-drivers.png" width="760" alt="Atualizador de drivers via Windows Update">
+<img src="docs/screenshots/en/update-drivers.png" width="760" alt="Driver updater using Windows Update">
 
-Procura drivers no **Windows Update** (a mesma fonte das *Atualizações opcionais* do Windows:
-drivers certificados e publicados pelos fabricantes) e instala os que você marcar, criando antes um
-**ponto de restauração**.
+Searches **Windows Update** for drivers (the same source as Windows *Optional updates*: drivers certified
+and published by the manufacturers) and installs the ones you check, creating a **restore point** first.
 
-### Ferramentas
+### Tools
 
-- **Desinstalar programas**: lista com ícone, desenvolvedor, data e tamanho; pesquisa; abre o
-  desinstalador do programa, abre a pasta de instalação, remove da lista programas que já foram
-  apagados e exporta a lista para texto.
-- **Inicialização**: programas que abrem com o Windows (registro e pasta Inicializar, do usuário e de
-  todos os usuários). **Desativar** usa o mesmo mecanismo do Gerenciador de Tarefas, então pode ser desfeito.
-- **Analisador de disco**: quanto espaço cada tipo de arquivo ocupa (imagens, músicas, vídeos,
-  documentos, compactados, e-mails, executáveis) e os maiores arquivos de cada tipo.
-- **Localizador de duplicados**: encontra arquivos de conteúdo idêntico (tamanho e MD5), marca as
-  cópias mantendo o mais antigo e manda para a Lixeira.
+- **Uninstall programs**: list with icon, developer, date and size; search; opens the program's own
+  uninstaller, opens the install folder, removes leftover entries of programs that were already deleted
+  and exports the list to text.
+- **Startup**: programs that open with Windows (registry and Startup folder, for the current user and for
+  all users). **Disable** uses the same mechanism as Task Manager, so it can be undone.
+- **Disk analyzer**: how much space each file type takes (images, music, videos, documents, archives,
+  email, executables) and the largest files of each type.
+- **Duplicate finder**: finds files with identical contents (size and MD5), checks the copies while keeping
+  the oldest one, and sends them to the Recycle Bin.
 
-## O que cada ação altera
+## What each action changes
 
-| Ação | O que acontece | Dá para desfazer? | Pede administrador? |
+| Action | What happens | Can it be undone? | Needs administrator? |
 |---|---|---|---|
-| Analisar, Verificar agora, Procurar | Só lê. Nada é alterado. | — | Não |
-| Executar limpeza / Limpar | Apaga os arquivos dos itens marcados (direto, sem passar pela Lixeira), esvazia a Lixeira, limpa o cache de DNS e a área de transferência e remove listas de itens recentes do registro | Não | Só para pastas do sistema (`C:\Windows\Temp`, Prefetch, Windows Update, Otimização de Entrega); sem permissão, esses arquivos são pulados |
-| Corrigir marcados (Registro) | Apaga as entradas órfãs marcadas | Sim, pelo backup `.reg` oferecido antes | Para entradas do sistema (HKLM) |
-| Atualizar marcados (programas) | O winget baixa e instala a versão nova de cada programa marcado | Depende do programa | O instalador do programa pode pedir |
-| Instalar marcados (drivers) | Cria um ponto de restauração e instala os drivers pelo Windows Update | Sim, pela Restauração do Sistema ou por *Reverter driver* | Sim |
-| Desinstalar | Abre o desinstalador do próprio programa | Não | Depende do programa |
-| Remover da lista | Apaga do registro a entrada de um programa que já não existe | Não | Para programas de todos os usuários |
-| Ativar / Desativar (inicialização) | Grava o mesmo valor que o Gerenciador de Tarefas usa | Sim | Para itens de todos os usuários |
-| Excluir (inicialização) | Remove o item; atalhos vão para a Lixeira | Atalhos, sim; itens do registro, não | Para itens de todos os usuários |
-| Mover para a Lixeira (disco e duplicados) | Move os arquivos escolhidos para a Lixeira | Sim | Não |
+| Analyze, Check now, Search, Scan | Read only. Nothing changes. | — | No |
+| Run cleaner / Clean | Deletes the files of the checked items (directly, not through the Recycle Bin), empties the Recycle Bin, clears the DNS cache and clipboard, and removes recent item lists from the registry | No | Only for system folders (`C:\Windows\Temp`, Prefetch, Windows Update, Delivery Optimization); without permission those files are skipped |
+| Fix checked (Registry) | Deletes the checked orphaned entries | Yes, with the `.reg` backup offered first | For system entries (HKLM) |
+| Update checked (programs) | winget downloads and installs the new version of each checked program | Depends on the program | The program's installer may ask |
+| Install checked (drivers) | Creates a restore point and installs the drivers through Windows Update | Yes, with System Restore or *Roll back driver* | Yes |
+| Uninstall | Opens the program's own uninstaller | No | Depends on the program |
+| Remove from list | Deletes the registry entry of a program that no longer exists | No | For programs installed for all users |
+| Enable / Disable (startup) | Writes the same value Task Manager uses | Yes | For all-users items |
+| Delete (startup) | Removes the item; shortcuts go to the Recycle Bin | Shortcuts, yes; registry items, no | For all-users items |
+| Move to Recycle Bin (disk and duplicates) | Moves the chosen files to the Recycle Bin | Yes | No |
 
-O app abre **sem** pedir administrador. Quando uma ação precisa, ele explica o motivo e oferece
-*Reiniciar como administrador*; o modo atual aparece no canto inferior da barra lateral.
+The app opens **without** asking for administrator rights. When an action needs them, it explains why and
+offers *Restart as administrator*; the current mode shows at the bottom of the sidebar.
 
-## Permissões e privacidade
+## Permissions and privacy
 
-**O que o OpenCleaner lê no seu PC:** as pastas e chaves de registro dos itens de limpeza, a lista de
-programas instalados e de inicialização, os processos abertos (para avisar quando um navegador está
-aberto e travando arquivos), o espaço em disco e o nome do Windows, do processador e da memória
-(mostrados na Verificação de saúde).
+**What OpenCleaner reads on your PC:** the folders and registry keys of the cleaning items, the lists of
+installed and startup programs, running processes (to warn you when a browser is open and locking files),
+disk space, and the names of your Windows edition, processor and memory (shown in the Health check).
 
-**O que ele grava:**
+**What it writes:**
 
-| Onde | O quê |
+| Where | What |
 |---|---|
-| `%AppData%\OpenCleaner\OpenCleaner.ini` | Suas escolhas de itens e opções |
-| `%AppData%\OpenCleaner\Backups\` | Backups `.reg` que você decidir salvar |
-| `%AppData%\OpenCleaner\auto.log` | Resultado das limpezas automáticas (`/AUTO`) |
-| `%LocalAppData%\Programs\OpenCleaner\` | O app e o desinstalador (só com o instalador) |
-| Menu Iniciar e `HKCU\...\Uninstall\OpenCleaner` | Atalho e a entrada em *Apps e recursos* (só com o instalador) |
+| `%AppData%\OpenCleaner\OpenCleaner.ini` | Your item choices and options |
+| `%AppData%\OpenCleaner\Backups\` | `.reg` backups you choose to save |
+| `%AppData%\OpenCleaner\auto.log` | Results of automatic cleanings (`/AUTO`) |
+| `%LocalAppData%\Programs\OpenCleaner\` | The app and the uninstaller (installer only) |
+| Start menu and `HKCU\...\Uninstall\OpenCleaner` | The shortcut and the *Apps & features* entry (installer only) |
 
-**Rede:** o OpenCleaner não tem servidor, conta nem telemetria. Ele só usa a internet quando você
-pede: **Atualizar programas** consulta o catálogo do winget (Microsoft) e **Atualizar drivers**
-consulta o Windows Update (Microsoft). O app não se atualiza sozinho nem inicia com o Windows.
+**Network:** OpenCleaner has no server, no account and no telemetry. It only goes online when you ask:
+**Update programs** queries the winget catalog (Microsoft) and **Update drivers** queries Windows Update
+(Microsoft). The app doesn't update itself or start with Windows.
 
-## Proteções contra estragos
+## Safeguards
 
-- Pastas do Windows e do seu perfil (Windows, System32, Arquivos de Programas, Documentos, Área de
-  Trabalho, a raiz do perfil e outras) **nunca** são varridas por inteiro, nem por regras do winapp2.
-- Junções e links simbólicos não são seguidos.
-- Senhas, cookies, histórico e formulários vêm **desmarcados** e pedem confirmação ao marcar.
-- O histórico do Firefox não é apagado, porque fica no mesmo arquivo dos favoritos.
-- O limpador de registro só aponta uma entrada quando o arquivo a que ela se refere comprovadamente
-  não existe; caminhos de rede e relativos são ignorados.
-- Duplicados e arquivos do analisador de disco vão para a Lixeira, nunca são apagados direto.
-- Em *Opções > Nunca apagar*, você protege qualquer pasta de todas as regras.
-- Opcional: **exclusão segura**, que sobrescreve cada arquivo com zeros antes de apagar.
+- Windows and user profile folders (Windows, System32, Program Files, Documents, Desktop, the profile root
+  and others) are **never** wiped as a whole, not even by winapp2 rules.
+- Junctions and symbolic links are not followed.
+- Passwords, cookies, history and form data start **unchecked** and ask for confirmation when checked.
+- Firefox history is not deleted, because it lives in the same file as your bookmarks.
+- The registry cleaner only flags an entry when the file it refers to provably doesn't exist; network and
+  relative paths are ignored.
+- Duplicates and disk analyzer files go to the Recycle Bin and are never deleted directly.
+- In *Options > Never delete*, you can protect any folder from every rule.
+- Optional **secure deletion** overwrites each file with zeros before deleting it.
 
-## Linha de comando e limpeza automática
+## Command line and automatic cleaning
 
-| Comando | Efeito |
+| Command | Effect |
 |---|---|
-| `OpenCleaner.exe /AUTO` | Limpa em segundo plano com os itens marcados, pula programas abertos e grava `auto.log` |
-| `OpenCleaner-Setup.exe /S /LANG=en` | Instala sem janela, em inglês (`/LANG=pt` para português) |
-| `uninstall.exe /uninstall /S` | Desinstala sem janela (o `uninstall.exe` fica na pasta de instalação) |
+| `OpenCleaner.exe /AUTO` | Cleans in the background with the checked items, skips open programs and writes `auto.log` |
+| `OpenCleaner-Setup.exe /S /LANG=en` | Silent install in English (`/LANG=pt` for Portuguese) |
+| `uninstall.exe /uninstall /S` | Silent uninstall (`uninstall.exe` is in the install folder) |
 
-Para limpar toda semana pelo Agendador de Tarefas:
+To clean every week with Task Scheduler:
 
 ```bat
-schtasks /create /tn "OpenCleaner semanal" /sc weekly /d SUN /st 12:00 ^
+schtasks /create /tn "OpenCleaner weekly" /sc weekly /d SUN /st 12:00 ^
   /tr "\"%LocalAppData%\Programs\OpenCleaner\OpenCleaner.exe\" /AUTO"
 ```
 
-## Perguntas frequentes
+## Frequently asked questions
 
-**É seguro limpar o registro?**
-Entradas órfãs não deixam o Windows lento; limpá-las é arrumação, não ganho de desempenho. Por
-isso o OpenCleaner é conservador: só aponta o que comprovadamente aponta para o nada e oferece
-backup antes. Se algo der errado, dê dois cliques no `.reg` salvo para restaurar.
+**Is it safe to clean the registry?**
+Orphaned entries don't slow Windows down; removing them is tidying up, not a performance boost. That's why
+OpenCleaner is conservative: it only flags what provably points to nothing and offers a backup first. If
+something goes wrong, double-click the saved `.reg` file to restore it.
 
-**Vou perder minhas senhas ou ser desconectado dos sites?**
-Não com a seleção padrão. Cookies, senhas, formulários e histórico vêm desmarcados; ao marcar, o app
-explica o que você vai perder.
+**Will I lose my passwords or be signed out of websites?**
+Not with the default selection. Cookies, passwords, form data and history start unchecked; when you check
+them, the app explains what you'll lose.
 
-**Por que ele pediu para fechar o navegador?**
-Navegadores abertos travam os arquivos de cache. Você pode deixar o OpenCleaner fechar o programa,
-pular os itens dele ou cancelar.
+**Why did it ask me to close my browser?**
+Open browsers lock their cache files. You can let OpenCleaner close the program, skip its items or cancel.
 
-**O antivírus ou o SmartScreen reclamou do instalador.**
-Apps novos e sem assinatura digital costumam receber esse aviso. O código está aqui, a release traz o
-SHA-256 de cada arquivo e o executável é compilado pelo GitHub Actions a partir deste repositório.
-Você também pode [compilar você mesmo](#compilar-a-partir-do-código).
+**My antivirus or SmartScreen complained about the installer.**
+New apps without a code-signing certificate often get this warning. The code is here, every release lists
+the SHA-256 of each file, and the executable is built by GitHub Actions from this repository. You can also
+[build it yourself](#build-from-source).
 
-**Funciona sem internet?**
-Sim. Só *Atualizar programas* e *Atualizar drivers* precisam de conexão.
+**Does it work offline?**
+Yes. Only *Update programs* and *Update drivers* need a connection.
 
-**Quanto espaço vou recuperar?**
-Depende do uso: caches de navegador e de apps costumam somar de centenas de MB a alguns GB. A
-análise mostra o valor exato antes de apagar qualquer coisa.
+**How much space will I get back?**
+It depends on how you use your PC: browser and app caches usually add up to hundreds of MB or a few GB.
+The analysis shows the exact amount before anything is deleted.
 
-**Qual a diferença para o CCleaner?**
-O OpenCleaner é gratuito por completo, de código aberto e sem telemetria. Ele não tem o otimizador de
-desempenho nem o limpador de espaço livre do CCleaner, e usa o winget e o Windows Update, fontes
-oficiais da Microsoft, para atualizar programas e drivers. A análise do funcionamento do CCleaner que
-orientou o projeto está em [docs/ANALISE.md](docs/ANALISE.md).
+**How is it different from CCleaner?**
+OpenCleaner is completely free, open source and has no telemetry. It doesn't have CCleaner's performance
+optimizer or free-space wiper, and it uses winget and Windows Update, Microsoft's official sources, to
+update programs and drivers. The analysis of how CCleaner works that guided this project is in
+[docs/ANALISE.md](docs/ANALISE.md) (in Portuguese).
 
-**O app fica rodando em segundo plano?**
-Não. Ele não cria serviço, não inicia com o Windows e não se atualiza sozinho. Para limpeza
-automática, use o Agendador de Tarefas com `/AUTO`.
+**Does the app keep running in the background?**
+No. It doesn't install a service, doesn't start with Windows and doesn't update itself. For automatic
+cleaning, use Task Scheduler with `/AUTO`.
 
-## Inspirações e créditos
+## Inspiration and credits
 
-- **[CCleaner](https://www.ccleaner.com)**, da Piriform/Gen Digital: referência de organização das
-  funções (Verificação de saúde, Limpeza personalizada, Registro e Ferramentas). O OpenCleaner foi
-  escrito do zero, sem código do CCleaner, a partir da observação do comportamento descrita em
-  [docs/ANALISE.md](docs/ANALISE.md).
-- **[BleachBit](https://www.bleachbit.org)**: a prova de que um limpador pode ser livre, aberto e respeitar o usuário.
-- **[Winapp2](https://github.com/MoscaDotTo/Winapp2)**: o formato de regras `winapp2.ini` e a lista
-  mantida pela comunidade, que o OpenCleaner lê.
-- **[Windows Package Manager (winget)](https://github.com/microsoft/winget-cli)** e **Windows Update**: as fontes das atualizações.
-- **[Lucide](https://lucide.dev)**: ícones (licença ISC).
-- **Bahnschrift**, **Segoe UI** e **Consolas**: fontes que acompanham o Windows.
+- **[CCleaner](https://www.ccleaner.com)**, by Piriform/Gen Digital: the reference for how the features are
+  organized (Health check, Custom clean, Registry and Tools). OpenCleaner was written from scratch, with no
+  CCleaner code, based on the behavior described in [docs/ANALISE.md](docs/ANALISE.md).
+- **[BleachBit](https://www.bleachbit.org)**: proof that a cleaner can be free, open and respectful of its users.
+- **[Winapp2](https://github.com/MoscaDotTo/Winapp2)**: the `winapp2.ini` rule format and the
+  community-maintained list that OpenCleaner reads.
+- **[Windows Package Manager (winget)](https://github.com/microsoft/winget-cli)** and **Windows Update**: the update sources.
+- **[Lucide](https://lucide.dev)**: icons (ISC license).
+- **Bahnschrift**, **Segoe UI** and **Consolas**: fonts that ship with Windows.
 
-> O OpenCleaner é um projeto independente, sem afiliação com a Piriform, a Gen Digital, a Avast ou a
-> Microsoft. CCleaner é marca registrada da Gen Digital Inc.
+> OpenCleaner is an independent project, not affiliated with Piriform, Gen Digital, Avast or Microsoft.
+> CCleaner is a registered trademark of Gen Digital Inc.
 
-## Compilar a partir do código
+## Build from source
 
-Não precisa instalar nada: o projeto usa o compilador C# (`csc.exe`) do .NET Framework 4.x que já
-vem com o Windows.
+Nothing to install: the project uses the C# compiler (`csc.exe`) of the .NET Framework 4.x that ships with
+Windows.
 
 ```powershell
 git clone https://github.com/flavioricardo/OpenCleaner.git
 cd OpenCleaner
-powershell -ExecutionPolicy Bypass -File build.ps1                       # gera bin\OpenCleaner.exe
-powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1   # gera dist\ (instalador, zip e SHA-256)
-powershell -ExecutionPolicy Bypass -File tests\run-smoke.ps1             # teste de fumaça
+powershell -ExecutionPolicy Bypass -File build.ps1                       # builds bin\OpenCleaner.exe
+powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1   # builds dist\ (installer, zip and SHA-256)
+powershell -ExecutionPolicy Bypass -File tests\run-smoke.ps1             # smoke test
 ```
 
-O teste de fumaça analisa (sem apagar) todas as regras detectadas, faz uma limpeza real numa pasta
-sandbox em `%TEMP%`, valida o parser do winget, desenha todos os ícones, varre o registro em modo
-leitura e salva capturas de cada tela. Com `-Drivers`, também consulta o Windows Update.
+The smoke test analyzes (without deleting) every detected rule, runs a real cleanup in a sandbox folder in
+`%TEMP%`, checks the winget parser, renders every icon, scans the registry read-only, checks that both
+languages keep the same rule IDs and saves screenshots of every screen in both languages. With `-Drivers`,
+it also queries Windows Update.
 
 ```
-src/Core/       motor: regras (formato winapp2), limpeza, registro, atualizadores, ferramentas, configurações
-src/UI/         interface WinForms e o renderizador dos ícones Lucide
-rules/          builtin.ini: as regras de limpeza embutidas, em texto
-installer/      instalador por usuário (Setup.cs) e o script de distribuição
-assets/         ícone do app e ícones Lucide em SVG
-tests/          teste de fumaça
-docs/           análise do CCleaner e capturas de tela
+src/Core/       engine: rules (winapp2 format), cleaning, registry, updaters, tools, settings, languages
+src/UI/         WinForms interface and the Lucide icon renderer
+rules/          builtin.ini: the built-in cleaning rules, as text (Portuguese and English)
+installer/      per-user installer (Setup.cs) and the distribution script
+assets/         app icon and Lucide SVG icons
+tests/          smoke test
+docs/           CCleaner analysis and screenshots
 ```
 
-**Publicar uma versão:** atualize a versão em `src/Program.cs` e o `CHANGELOG.md`, crie a tag e envie.
-O GitHub Actions compila e publica a release com o instalador, o zip e o `SHA256SUMS.txt`.
+**Translations:** interface text sits next to its translation in the code, as `L.T("Portuguese", "English")`;
+cleaning rules use `Item=`/`ItemEn=`, `Group=`/`GroupEn=` and `Warning=`/`WarningEn=` in `rules/builtin.ini`.
+
+**Releasing a version:** update the version in `src/Program.cs` and `CHANGELOG.md`, then create and push
+the tag. GitHub Actions builds and publishes the release with the installer, the zip and `SHA256SUMS.txt`.
 
 ```bash
-git tag v1.0.1 && git push origin v1.0.1
+git tag -a v1.0.1 -m "OpenCleaner 1.0.1" && git push origin main --follow-tags
 ```
 
-### Identidade visual
+### Visual identity
 
-| Token | Cor | Uso |
+| Token | Color | Use |
 |---|---|---|
-| Névoa | `#EEF1F4` | fundo das páginas |
-| Papel | `#FFFFFF` | barra lateral, cartões e listas |
-| Tinta | `#1B1F24` | texto |
-| Grafite | `#5B636E` | texto secundário (contraste de 5,4:1 sobre Névoa) |
-| Verde-limpo | `#0E7C66` | ação principal e seleção (5,1:1 com branco) |
-| Ardósia | `#3A414B` | espaço usado no medidor |
-| Âmbar | `#8A5A12` sobre `#FFF4DC` | avisos |
+| Mist | `#EEF1F4` | page background |
+| Paper | `#FFFFFF` | sidebar, cards and lists |
+| Ink | `#1B1F24` | text |
+| Graphite | `#5B636E` | secondary text (5.4:1 contrast on Mist) |
+| Clean green | `#0E7C66` | primary action and selection (5.1:1 with white) |
+| Slate | `#3A414B` | used space in the meter |
+| Amber | `#8A5A12` on `#FFF4DC` | warnings |
 
-Títulos e números em **Bahnschrift**, texto em **Segoe UI**, caminhos e chaves em **Consolas**. Toda
-página segue o mesmo modelo: título, barra de ações (ação principal na ponta direita), linha de
-status e conteúdo com um estado vazio que diz o que fazer.
+Headings and numbers in **Bahnschrift**, body text in **Segoe UI**, paths and keys in **Consolas**. Every
+page follows the same layout: title, action bar (primary action on the far right), status line and content
+with an empty state that tells you what to do.
 
-## Contribuir
+## Contributing
 
-Sugestões e correções são bem-vindas em [Issues](https://github.com/flavioricardo/OpenCleaner/issues).
+Suggestions and fixes are welcome in [Issues](https://github.com/flavioricardo/OpenCleaner/issues).
 
-- **Nova regra de limpeza:** edite [`rules/builtin.ini`](rules/builtin.ini). O formato é o do winapp2
-  (`FileKey`, `RegKey`, `Detect`, `ExcludeKey`) com algumas chaves extras explicadas no topo do arquivo.
-  Diga de onde vem cada caminho e por que é seguro apagar.
-- **Bug:** informe a versão do Windows, o que fez, o que esperava e o que aconteceu.
-- Antes de enviar um pull request, rode `tests\run-smoke.ps1`.
+- **New cleaning rule:** edit [`rules/builtin.ini`](rules/builtin.ini). The format is winapp2's (`FileKey`,
+  `RegKey`, `Detect`, `ExcludeKey`) plus a few extra keys explained at the top of the file. Say where each
+  path comes from and why it's safe to delete, and add the English name (`ItemEn=`).
+- **Bug:** tell us your Windows version, what you did, what you expected and what happened.
+- Before opening a pull request, run `tests\run-smoke.ps1`.
 
-## Licença
+## License
 
-[MIT](LICENSE). Ícones Lucide sob a licença ISC ([assets/icons/LICENSE](assets/icons/LICENSE)).
-
----
-
-## English
-
-**OpenCleaner** is a free and open-source **PC cleaner for Windows 10 and 11**, a lightweight
-**CCleaner alternative** with **no telemetry, no ads and no paid tier**. The app and the installer are available in **English and Brazilian Portuguese**: they follow the Windows language, and you can switch in the installer window or in *Options > Idioma · Language*.
-
-- **Health check** with a disk-space meter showing how much can be reclaimed.
-- **Custom clean**: 70+ built-in rules for Windows temp files, Recycle Bin, logs, crash dumps, thumbnail
-  and shader caches, Windows Update leftovers and DNS cache; Chrome, Edge, Brave, Vivaldi, Opera and Firefox
-  (cache, cookies, sessions and saved forms; history and passwords on Chromium browsers); and apps such as Discord, Teams, Zoom, Spotify,
-  VS Code and Steam. Supports the community **`winapp2.ini`** rule file.
-- **Registry cleaner** with seven conservative categories and `.reg` backups.
-- **Software updater** powered by **winget** and **driver updater** powered by **Windows Update**, with a
-  restore point before installing drivers.
-- **Uninstaller**, **startup manager** (same mechanism as Task Manager), **disk analyzer** and **duplicate finder**.
-- **Command line**: `OpenCleaner.exe /AUTO` for silent scheduled cleaning.
-- **Installer** for the current user only, no administrator rights required. A portable zip is also available.
-
-<img src="docs/screenshots/health-check-en.png" width="760" alt="OpenCleaner health check in English, with the disk space meter">
-
-**[Download the installer](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-Setup.exe)** ·
-[portable zip](https://github.com/flavioricardo/OpenCleaner/releases/latest/download/OpenCleaner-portable.zip) ·
-MIT license · not affiliated with Piriform, Gen Digital or Microsoft.
+[MIT](LICENSE). Lucide icons under the ISC license ([assets/icons/LICENSE](assets/icons/LICENSE)).
