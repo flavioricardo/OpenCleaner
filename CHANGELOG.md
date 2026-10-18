@@ -1,9 +1,13 @@
 # Changelog
 
+**English** · [Português (Brasil)](CHANGELOG.pt-BR.md)
+
 All notable changes to OpenCleaner. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [1.2.0] - 2026-10-18
 
 ### Added
 
@@ -17,10 +21,17 @@ and versions follow [Semantic Versioning](https://semver.org/).
   AC is not *Best performance* (read-only; opens *Settings > System > Power*).
 - Gaming: **PC Game Pass games** installed by the Xbox app (`XboxGames\<game>\Content`) are found and can be
   set to the dedicated graphics card; `gamelaunchhelper.exe` is ignored.
+- Changelog in Portuguese too ([CHANGELOG.pt-BR.md](CHANGELOG.pt-BR.md)), with English as the main version.
+- A manual workflow, *Rewrite release notes*, regenerates the notes of an already published release.
 
 ### Changed
 
 - The changelog and the release notes are now in English.
+
+### Fixed
+
+- Release notes had broken accents ("sÃ³") and a stray byte-order mark: the release workflow read the
+  template as ANSI under Windows PowerShell 5.1. Notes are now read and written as UTF-8 without BOM.
 
 ### Security
 
@@ -119,7 +130,8 @@ First public release.
 - App, installer and uninstaller in Portuguese and English, following the Windows language by default, with a
   selector in the installer and in *Options*; saved cleaning selections work in both languages.
 
-[Unreleased]: https://github.com/flavioricardo/OpenCleaner/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/flavioricardo/OpenCleaner/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.2.0
 [1.1.0]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.1.0
 [1.0.1]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.0.1
 [1.0.0]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.0.0

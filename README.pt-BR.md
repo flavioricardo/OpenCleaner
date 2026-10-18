@@ -357,11 +357,13 @@ docs/           análise do CCleaner, o plano da página Jogos (PLANO-JOGOS.md) 
 **Traduções:** os textos da interface ficam ao lado da tradução no código, como `L.T("português", "English")`;
 as regras de limpeza usam `Item=`/`ItemEn=`, `Group=`/`GroupEn=` e `Warning=`/`WarningEn=` em `rules/builtin.ini`.
 
-**Publicar uma versão:** atualize a versão em `src/Program.cs` e o `CHANGELOG.md`, crie a tag e envie.
-O GitHub Actions compila e publica a release com o instalador, o zip e o `SHA256SUMS.txt`.
+**Publicar uma versão:** atualize a versão em `src/Program.cs` e o changelog (`CHANGELOG.md` em inglês, o
+principal, e a tradução `CHANGELOG.pt-BR.md`), crie a tag e envie. O GitHub Actions compila e publica a
+release com o instalador, o zip e o `SHA256SUMS.txt`. Para refazer as notas de uma release já publicada, rode
+o workflow *Rewrite release notes* na aba Actions.
 
 ```bash
-git tag -a v1.1.0 -m "OpenCleaner 1.1.0" && git push origin main --follow-tags
+git tag -a v1.2.0 -m "OpenCleaner 1.2.0" && git push origin main --follow-tags
 ```
 
 ### Identidade visual

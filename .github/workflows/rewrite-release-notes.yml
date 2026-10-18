@@ -1,0 +1,31 @@
+name: Rewrite release notes
+
+# Regenerates the notes of an already published release from .github/release-notes.md, with the SHA-256
+# sums taken from that release's own SHA256SUMS.txt. Run it from the Actions tab (Run workflow) to fix old
+# notes, such as the broken accents in 1.0.0-1.1.0. Only the notes change; the files stay the same.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to rewrite (for example v1.1.0)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  notes:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rewrite notes
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          if ($env:TAG -notmatch '^v\d+\.\d+\.\d+$') { throw "Invalid tag: $env:TAG" }
+          gh release download $env:TAG --pattern SHA256SUMS.txt --dir sums --repo $env:GITHUB_REPOSITORY
+          ./.github/write-release-notes.ps1 -Tag $env:TAG -Repo $env:GITHUB_REPOSITORY -Sums sums/SHA256SUMS.txt -Out notes.md
+          gh release edit $env:TAG --notes-file notes.md --repo $env:GITHUB_REPOSITORY

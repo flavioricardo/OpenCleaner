@@ -14,7 +14,7 @@ Languages: English and Portuguese (the installer has a selector; later, *Options
 
 ## What's new
 
-See the [CHANGELOG](https://github.com/{REPO}/blob/{TAG}/CHANGELOG.md).
+See the [CHANGELOG](https://github.com/{REPO}/blob/main/CHANGELOG.md) · [Changelog em português](https://github.com/{REPO}/blob/main/CHANGELOG.pt-BR.md).
 
 ## SHA-256
 

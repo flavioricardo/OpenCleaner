@@ -352,11 +352,13 @@ docs/           CCleaner analysis, the Gaming plan (PLANO-JOGOS.md) and screensh
 **Translations:** interface text sits next to its translation in the code, as `L.T("Portuguese", "English")`;
 cleaning rules use `Item=`/`ItemEn=`, `Group=`/`GroupEn=` and `Warning=`/`WarningEn=` in `rules/builtin.ini`.
 
-**Releasing a version:** update the version in `src/Program.cs` and `CHANGELOG.md`, then create and push
-the tag. GitHub Actions builds and publishes the release with the installer, the zip and `SHA256SUMS.txt`.
+**Releasing a version:** update the version in `src/Program.cs` and the changelog (`CHANGELOG.md` in English,
+the main one, and its translation `CHANGELOG.pt-BR.md`), then create and push the tag. GitHub Actions builds
+and publishes the release with the installer, the zip and `SHA256SUMS.txt`. To regenerate the notes of a
+release that is already out, run the *Rewrite release notes* workflow from the Actions tab.
 
 ```bash
-git tag -a v1.1.0 -m "OpenCleaner 1.1.0" && git push origin main --follow-tags
+git tag -a v1.2.0 -m "OpenCleaner 1.2.0" && git push origin main --follow-tags
 ```
 
 ### Visual identity
