@@ -8,6 +8,11 @@ arquivo é a [em inglês](CHANGELOG.md); esta é a tradução.
 
 ## [Não lançado]
 
+### Corrigido
+
+- Análise de disco e localizador de duplicados: escolher uma categoria não fecha mais o app com
+  `PathTooLongException` quando um arquivo analisado tem caminho com mais de 260 caracteres.
+
 ## [1.2.0] - 2026-10-18
 
 ### Adicionado

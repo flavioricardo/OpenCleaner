@@ -275,6 +275,10 @@ static class SmokeTest
         Check(Util.ExtractExePath(@"C:\Windows\System32\cmd.exe /c echo") == @"C:\Windows\System32\cmd.exe", "ExtractExePath sem aspas e com espaços");
         Check(Util.ExtractExePath("rundll32.exe foo.dll,Bar") == null, "ExtractExePath ignora relativo");
         Check(Util.ExtractExePath(@"C:\Nao Existe\app.exe -x") == @"C:\Nao Existe\app.exe", "ExtractExePath de exe ausente");
+        string deep = @"C:\" + string.Join(@"\", Enumerable.Repeat(new string('d', 50), 6)) + @"\arquivo.txt"; // > 260 caracteres
+        Check(Util.FileNameOf(deep) == "arquivo.txt", "FileNameOf com caminho longo");
+        Check(Util.DirectoryOf(deep) == deep.Substring(0, deep.Length - 12), "DirectoryOf com caminho longo");
+        Check(Util.DirectoryOf(@"C:\a.txt") == @"C:\", "DirectoryOf na raiz da unidade");
         Check(Util.FormatSize(1536) == "1.5 KB" || Util.FormatSize(1536) == "1,5 KB", "FormatSize");
 
         Console.WriteLine("== winget ==");

@@ -367,7 +367,7 @@ namespace OpenCleaner.Core
                 Status = L.T("Comparando conteúdo... ", "Comparing contents... ") + (++done) + "/" + candidates.Count;
                 IEnumerable<List<FileEntry>> sets = new[] { sameSize };
                 if (MatchName)
-                    sets = sameSize.GroupBy(f => Path.GetFileName(f.Path), StringComparer.OrdinalIgnoreCase)
+                    sets = sameSize.GroupBy(f => Util.FileNameOf(f.Path), StringComparer.OrdinalIgnoreCase)
                                    .Select(g => g.ToList()).Where(l => l.Count > 1);
                 foreach (var set in sets)
                 {

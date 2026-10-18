@@ -210,10 +210,10 @@ namespace OpenCleaner.UI
             list.Items.Clear();
             foreach (var f in c.Files.OrderByDescending(f => f.Size))
             {
-                var it = new ListViewItem(Path.GetFileName(f.Path)) { Tag = f.Path };
+                var it = new ListViewItem(Util.FileNameOf(f.Path)) { Tag = f.Path };
                 Theme.SizeCell(it, f.Size);
                 it.SubItems.Add(new ListViewItem.ListViewSubItem(it, f.Modified.ToString("dd/MM/yyyy HH:mm")) { Tag = f.Modified });
-                Theme.MonoCell(it, Path.GetDirectoryName(f.Path));
+                Theme.MonoCell(it, Util.DirectoryOf(f.Path));
                 list.Items.Add(it);
             }
             Theme.Refit(list);
@@ -338,10 +338,10 @@ namespace OpenCleaner.UI
                     var lg = list.Groups.Add("g" + n, L.T("Grupo ", "Group ") + (++n) + " · " + g.Count + L.T(" cópias de ", " copies of ") + Util.FormatSize(g[0].Size));
                     foreach (var fe in g)
                     {
-                        var it = new ListViewItem(Path.GetFileName(fe.Path), lg) { Tag = fe.Path };
+                        var it = new ListViewItem(Util.FileNameOf(fe.Path), lg) { Tag = fe.Path };
                         Theme.SizeCell(it, fe.Size);
                         it.SubItems.Add(fe.Modified.ToString("dd/MM/yyyy HH:mm"));
-                        Theme.MonoCell(it, Path.GetDirectoryName(fe.Path));
+                        Theme.MonoCell(it, Util.DirectoryOf(fe.Path));
                         list.Items.Add(it);
                     }
                 }

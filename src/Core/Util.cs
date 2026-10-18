@@ -304,6 +304,22 @@ namespace OpenCleaner.Core
                     Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
         }
 
+        // Path.GetFileName/GetDirectoryName lançam PathTooLongException acima de 260 caracteres no
+        // .NET Framework, mas a enumeração devolve caminhos assim (FullName não é validado).
+        public static string FileNameOf(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return path;
+            return path.Substring(path.LastIndexOfAny(new[] { '\\', '/' }) + 1);
+        }
+
+        public static string DirectoryOf(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return path;
+            int i = path.LastIndexOfAny(new[] { '\\', '/' });
+            if (i < 0) return "";
+            return i == 2 && path[1] == ':' ? path.Substring(0, 3) : path.Substring(0, i); // C:\x -> C:\
+        }
+
         public static void ShowInExplorer(string path)
         {
             if (string.IsNullOrEmpty(path)) return;
