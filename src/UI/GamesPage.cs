@@ -317,7 +317,7 @@ namespace OpenCleaner.UI
             if (backup == DialogResult.Yes)
             {
                 string dir = Path.Combine(AppSettings.DataDir, "Backups");
-                string suggested = Path.Combine(dir, "jogos-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".reg");
+                string suggested = Path.Combine(dir, L.T("jogos-", "games-") + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".reg");
                 string target = PickBackupFile(suggested);
                 if (target == null) return;
                 Cursor = Cursors.WaitCursor;

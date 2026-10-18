@@ -12,6 +12,8 @@ arquivo é a [em inglês](CHANGELOG.md); esta é a tradução.
 
 - Análise de disco e localizador de duplicados: escolher uma categoria não fecha mais o app com
   `PathTooLongException` quando um arquivo analisado tem caminho com mais de 260 caracteres.
+- Os backups do Registro e de Jogos (`registry-…reg`, `games-…reg`) e a lista de programas instalados
+  (`installed-programs.txt`) agora são sugeridos com nome em inglês quando a interface está em inglês.
 
 ## [1.2.0] - 2026-10-18
 

@@ -190,7 +190,7 @@ namespace OpenCleaner.UI
 
         void Export()
         {
-            using (var d = new SaveFileDialog { Filter = L.T("Texto (*.txt)|*.txt", "Text (*.txt)|*.txt"), FileName = "programas-instalados.txt" })
+            using (var d = new SaveFileDialog { Filter = L.T("Texto (*.txt)|*.txt", "Text (*.txt)|*.txt"), FileName = L.T("programas-instalados.txt", "installed-programs.txt") })
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 var sb = new StringBuilder();

@@ -11,6 +11,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 - Disk analyzer and duplicate finder: selecting a category no longer crashes with `PathTooLongException` when
   a scanned file has a path longer than 260 characters.
+- Registry and Gaming backups (`registry-…reg`, `games-…reg`) and the installed programs export
+  (`installed-programs.txt`) are now suggested with English names when the interface is in English.
 
 ## [1.2.0] - 2026-10-18
 

@@ -152,7 +152,7 @@ namespace OpenCleaner.UI
                 using (var d = new SaveFileDialog
                 {
                     InitialDirectory = dir, Filter = L.T("Arquivo de registro (*.reg)|*.reg", "Registry file (*.reg)|*.reg"),
-                    FileName = "registro-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".reg"
+                    FileName = L.T("registro-", "registry-") + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".reg"
                 })
                 {
                     if (d.ShowDialog(this) != DialogResult.OK) return;
