@@ -413,7 +413,7 @@ namespace OpenCleaner.Core
             try
             {
                 using (var md5 = MD5.Create())
-                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1 << 16))
+                using (var fs = Util.OpenRead(path, 1 << 16))
                 {
                     if (limit == long.MaxValue) return BitConverter.ToString(md5.ComputeHash(fs));
                     var buf = new byte[limit];

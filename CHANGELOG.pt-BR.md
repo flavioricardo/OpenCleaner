@@ -17,6 +17,8 @@ arquivo é a [em inglês](CHANGELOG.md); esta é a tradução.
 - Desinstalar programas: a lista se atualiza sozinha quando a desinstalação termina. Desinstaladores que se
   reabrem a partir do `%TEMP%` (NSIS, Inno Setup) fechavam o processo original na hora, e a lista era
   recarregada antes de qualquer coisa ser removida.
+- Localizador de duplicados: arquivos com caminho de mais de 260 caracteres também são comparados. Antes eles
+  não podiam ser abertos para o cálculo do hash e ficavam de fora dos grupos sem aviso.
 
 ## [1.2.0] - 2026-10-18
 

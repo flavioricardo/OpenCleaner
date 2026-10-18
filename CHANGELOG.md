@@ -16,6 +16,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - Uninstall programs: the list refreshes by itself when the uninstall finishes. Uninstallers that relaunch
   themselves from `%TEMP%` (NSIS, Inno Setup) closed the original process right away, so the list was
   reloaded before anything was removed.
+- Duplicate finder: files with a path longer than 260 characters are compared too. Before, they could not be
+  opened for hashing and were quietly left out of the duplicate groups.
 
 ## [1.2.0] - 2026-10-18
 

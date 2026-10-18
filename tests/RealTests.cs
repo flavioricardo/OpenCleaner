@@ -1439,6 +1439,23 @@ static class RealTests
         var named = new DuplicateFinder { MinSize = 1024, MatchName = true }.Find(d);
         Check(named.Count == 1 && named[0].Count == 2, "com \"Exigir o mesmo nome\", só as 2 cópias chamadas a.bin");
 
+        // Pasta com menos de 248 caracteres (é listada) e nome que passa o arquivo de 260: o .NET Framework não o abre
+        string dl = Path.Combine(sandbox, "dups-longo");
+        string longName = new string('n', 45) + ".bin";
+        string longDir = Path.Combine(dl, new string('p', 230 - dl.Length - 1));
+        put(Path.Combine(dl, longName), a);
+        put(Path.Combine(dl, "outro.bin"), a);
+        string longFile = longDir + "\\" + longName;
+        var cp = Process.Start(new ProcessStartInfo("cmd.exe", "/c mkdir \"" + longDir + "\" && copy /y \"" + Path.Combine(dl, longName) + "\" \"\\\\?\\" + longFile + "\"")
+        { CreateNoWindow = true, UseShellExecute = false });
+        cp.WaitForExit();
+        var longAll = new DuplicateFinder { MinSize = 1024 }.Find(dl);
+        Check(longAll.Count == 1 && longAll[0].Count == 3 && longAll[0].Any(f => f.Path == longFile),
+              "arquivo com caminho de " + longFile.Length + " caracteres entra no grupo de duplicados (" + longAll.Sum(g => g.Count) + " de 3)");
+        var longNamed = new DuplicateFinder { MinSize = 1024, MatchName = true }.Find(dl);
+        Check(longNamed.Count == 1 && longNamed[0].Count == 2 && longNamed[0].Any(f => f.Path == longFile),
+              "com \"Exigir o mesmo nome\", a cópia de caminho longo também é achada");
+
         // Mover para a Lixeira: some da pasta e aparece na Lixeira; depois tiramos só o nosso item de lá
         string victim = Path.Combine(d, "copia", "a-copia.bin");
         Util.SendToRecycleBin(victim);

@@ -320,6 +320,24 @@ namespace OpenCleaner.Core
             return i == 2 && path[1] == ':' ? path.Substring(0, 3) : path.Substring(0, i); // C:\x -> C:\
         }
 
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+        static extern Microsoft.Win32.SafeHandles.SafeFileHandle CreateFile(string name, uint access, FileShare share,
+            IntPtr security, FileMode mode, uint flags, IntPtr template);
+
+        /// <summary>
+        /// Abre para leitura também acima de 260 caracteres: o FileStream do .NET Framework recusa o caminho
+        /// (e o prefixo \\?\), mas o CreateFile do Windows aceita \\?\ e o FileStream lê pelo handle.
+        /// </summary>
+        public static FileStream OpenRead(string path, int bufferSize)
+        {
+            try { return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize); }
+            catch (PathTooLongException) { }
+            string full = path.StartsWith(@"\\") ? @"\\?\UNC\" + path.Substring(2) : @"\\?\" + path;
+            var h = CreateFile(full, 0x80000000 /* GENERIC_READ */, FileShare.ReadWrite, IntPtr.Zero, FileMode.Open, 0, IntPtr.Zero);
+            if (h.IsInvalid) throw new System.ComponentModel.Win32Exception();
+            return new FileStream(h, FileAccess.Read, bufferSize);
+        }
+
         public static void ShowInExplorer(string path)
         {
             if (string.IsNullOrEmpty(path)) return;
