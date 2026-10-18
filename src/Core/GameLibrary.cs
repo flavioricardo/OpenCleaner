@@ -92,12 +92,24 @@ namespace OpenCleaner.Core
             return file.StartsWith(f, StringComparison.OrdinalIgnoreCase);
         }
 
+        static readonly string WinDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows).TrimEnd('\\') + "\\";
+
+        /// <summary>Caminho absoluto e local de um .exe que existe, fora do Windows e da Store, e que não é auxiliar.</summary>
         static bool IsGameExe(string exe)
         {
-            return !string.IsNullOrEmpty(exe) && Path.IsPathRooted(exe) && !exe.StartsWith(@"\\") &&
+            return !string.IsNullOrEmpty(exe) && exe.Length < 1024 && exe.Length > 3 && exe[1] == ':' && exe[2] == '\\' &&
                    exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) &&
                    exe.IndexOf(@"\WindowsApps\", StringComparison.OrdinalIgnoreCase) < 0 &&
+                   !exe.StartsWith(WinDir, StringComparison.OrdinalIgnoreCase) &&
                    !Helper.IsMatch(Path.GetFileName(exe)) && File.Exists(exe);
+        }
+
+        /// <summary>Forma canônica (resolve "..", "." e nomes 8.3) para comparar caminhos que vieram de fora.</summary>
+        static string Normalize(string path)
+        {
+            if (string.IsNullOrEmpty(path) || path.IndexOfAny(Path.GetInvalidPathChars()) >= 0) return null;
+            try { return Util.Canonical(path); }
+            catch { return null; }
         }
 
         /// <summary>Executáveis que o Windows reconheceu como jogo e viu rodar (a mesma lista da Game Bar).</summary>
@@ -110,7 +122,10 @@ namespace OpenCleaner.Core
                 foreach (var name in k.GetSubKeyNames())
                     using (var c = k.OpenSubKey(name))
                     {
-                        string exe = c == null ? null : Util.ReadString(c, "MatchedExeFullPath");
+                        // Só texto: um valor binário ou DWORD no lugar do caminho é ignorado.
+                        string exe = c == null ? null : c.GetValue("MatchedExeFullPath") as string;
+                        if (exe == null || exe.Length >= 1024) continue;
+                        exe = Normalize(exe);
                         if (IsGameExe(exe) && !list.Contains(exe, StringComparer.OrdinalIgnoreCase)) list.Add(exe);
                     }
             }
@@ -159,27 +174,37 @@ namespace OpenCleaner.Core
                     string text;
                     try { text = File.ReadAllText(acf); } catch { continue; }
                     string id = VdfValue(text, "appid"), name = VdfValue(text, "name"), dir = VdfValue(text, "installdir");
-                    if (id == "228980" || string.IsNullOrEmpty(dir) || dir.IndexOfAny(Path.GetInvalidPathChars()) >= 0 || dir.Contains("..")) continue; // 228980 = Steamworks Common Redistributables
-                    string folder = Path.Combine(apps, "common", dir);
-                    if (!Directory.Exists(folder) || games.Any(g => g.Folder.Equals(folder, StringComparison.OrdinalIgnoreCase))) continue;
+                    // installdir é o nome de uma pasta dentro de steamapps\common: nada de caminho absoluto, barras ou "..".
+                    if (id == "228980" || string.IsNullOrEmpty(dir) || dir.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || dir.Trim('.', ' ').Length == 0) continue; // 228980 = Steamworks Common Redistributables
+                    string folder = Normalize(Path.Combine(apps, "common", dir));
+                    if (folder == null || !Directory.Exists(folder) || games.Any(g => g.Folder.Equals(folder, StringComparison.OrdinalIgnoreCase))) continue;
                     games.Add(new InstalledGame { Name = name ?? dir, Store = "Steam", Folder = folder });
                 }
             }
         }
 
-        /// <summary>Executáveis até três níveis abaixo da pasta do jogo, sem auxiliares, sem seguir junções.</summary>
+        const int MaxGuessedExes = 30;
+
+        /// <summary>
+        /// Executáveis até três níveis abaixo da pasta do jogo, sem auxiliares, sem seguir junções e no máximo 30.
+        /// Pasta de jogo que é ela mesma uma junção não entra no palpite: o destino pode ser qualquer lugar.
+        /// </summary>
         static List<string> GuessExes(string folder)
         {
             var result = new List<string>();
+            if (Util.IsReparsePoint(folder)) return result;
             var queue = new Queue<KeyValuePair<string, int>>();
             queue.Enqueue(new KeyValuePair<string, int>(folder, 0));
-            while (queue.Count > 0 && result.Count < 30)
+            while (queue.Count > 0 && result.Count < MaxGuessedExes)
             {
                 var cur = queue.Dequeue();
                 try
                 {
                     foreach (var exe in Directory.EnumerateFiles(cur.Key, "*.exe"))
+                    {
                         if (IsGameExe(exe)) result.Add(exe);
+                        if (result.Count >= MaxGuessedExes) return result;
+                    }
                     if (cur.Value >= 3) continue;
                     foreach (var sub in Directory.EnumerateDirectories(cur.Key))
                         if (!Util.IsReparsePoint(sub) && !HelperDir.IsMatch(Path.GetFileName(sub)))
@@ -208,10 +233,13 @@ namespace OpenCleaner.Core
                 string text;
                 try { text = File.ReadAllText(item); } catch { continue; }
                 string name = JsonValue(text, "DisplayName"), folder = JsonValue(text, "InstallLocation"), launch = JsonValue(text, "LaunchExecutable");
-                if (string.IsNullOrEmpty(folder) || string.IsNullOrEmpty(launch) || !Path.IsPathRooted(folder) || launch.Contains("..")) continue;
-                folder = folder.Replace('/', '\\').TrimEnd('\\');
-                string exe = Path.Combine(folder, launch.Replace('/', '\\'));
-                if (!IsGameExe(exe) || games.Any(g => g.Folder.Equals(folder, StringComparison.OrdinalIgnoreCase))) continue;
+                if (string.IsNullOrEmpty(folder) || string.IsNullOrEmpty(launch) || launch.Contains("..")) continue;
+                folder = Normalize(folder.Replace('/', '\\'));
+                launch = launch.Replace('/', '\\').TrimStart('\\');
+                if (folder == null || Path.IsPathRooted(launch)) continue; // LaunchExecutable é relativo à pasta do jogo
+                string exe = Normalize(Path.Combine(folder, launch));
+                // O executável tem de ficar dentro da pasta do jogo.
+                if (exe == null || !IsUnder(exe, folder) || !IsGameExe(exe) || games.Any(g => g.Folder.Equals(folder, StringComparison.OrdinalIgnoreCase))) continue;
                 var game = new InstalledGame { Name = name ?? Path.GetFileName(folder), Store = "Epic", Folder = folder };
                 game.Exes.Add(exe);
                 games.Add(game);

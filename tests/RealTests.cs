@@ -94,6 +94,8 @@ static class RealTests
             StartupReal();
             GamesReal();
             GpuReal();
+            GamesSecurity();
+            GamesPerformance();
             UninstallReal(outDir);
             DiskAnalyzerReal(fullDisk);
             DuplicatesReal();
@@ -979,6 +981,265 @@ static class RealTests
         Perf("Encontrar jogos e placas (PC real, só leitura)", real, mine.Count + " jogos (" + string.Join(", ", mine.Select(g => g.Name)) + "); " +
              string.Join(" + ", adapters.Select(x => x.Name)) + (hybrid ? "; híbrido" : ""));
         Check(real.ElapsedMilliseconds < 5000, "descoberta de jogos e placas no PC real em menos de 5 s");
+    }
+
+    // =====================================================================
+    // 6d. Jogos: ataques (bibliotecas, manifestos e registro maliciosos)
+    // =====================================================================
+
+    static void GamesSecurity()
+    {
+        Section("Segurança: jogos com manifestos, bibliotecas e registro maliciosos");
+        string win = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        string sys = Environment.SystemDirectory;
+        string root = Path.Combine(sandbox, "jogos-ataque");
+        string steam = Path.Combine(root, "Steam");
+        string apps = Path.Combine(steam, "steamapps");
+        Directory.CreateDirectory(Path.Combine(apps, "common"));
+        Func<string, string, string, string> acf = (id, name, dir) => "\"AppState\"\n{\n\t\"appid\"\t\t\"" + id + "\"\n\t\"name\"\t\t\"" + name + "\"\n\t\"installdir\"\t\t\"" + dir.Replace(@"\", @"\\") + "\"\n}\n";
+        // installdir absoluto, com "..", com barra e um jogo legítimo
+        File.WriteAllText(Path.Combine(apps, "appmanifest_1.acf"), acf("1", "Absoluto", win));
+        File.WriteAllText(Path.Combine(apps, "appmanifest_2.acf"), acf("2", "Sobe", @"..\..\..\Windows"));
+        File.WriteAllText(Path.Combine(apps, "appmanifest_3.acf"), acf("3", "Barra", @"Legit\..\..\..\Windows"));
+        File.WriteAllText(Path.Combine(apps, "appmanifest_4.acf"), acf("4", "Legítimo", "Legitimo"));
+        Write(Path.Combine(apps, @"common\Legitimo\Legitimo.exe"));
+        // pasta de jogo que é uma junção para o System32
+        File.WriteAllText(Path.Combine(apps, "appmanifest_5.acf"), acf("5", "Juncao", "Juncao"));
+        bool junction = Junction(Path.Combine(apps, @"common\Juncao"), sys);
+        // manifesto quebrado e binário
+        File.WriteAllBytes(Path.Combine(apps, "appmanifest_6.acf"), new byte[] { 0, 1, 2, 0x22, 0xFF, 0xFE });
+        File.WriteAllText(Path.Combine(apps, "appmanifest_7.acf"), "\"AppState\" { \"installdir\" \"");
+
+        string manifests = Directory.CreateDirectory(Path.Combine(root, "Manifests")).FullName;
+        string epicDir = Path.Combine(root, "Epic");
+        Write(Path.Combine(epicDir, "ok.exe"));
+        Func<string, string, string, string> item = (name, folder, launch) =>
+            "{\"DisplayName\": \"" + name + "\", \"InstallLocation\": \"" + folder.Replace(@"\", @"\\") + "\", \"LaunchExecutable\": \"" + launch.Replace(@"\", @"\\") + "\"}";
+        File.WriteAllText(Path.Combine(manifests, "a.item"), item("Epic absoluto", epicDir, Path.Combine(sys, "notepad.exe")));
+        File.WriteAllText(Path.Combine(manifests, "b.item"), item("Epic barra", epicDir, "/Windows/System32/notepad.exe"));
+        File.WriteAllText(Path.Combine(manifests, "c.item"), item("Epic rede", @"\\servidor\jogos", "jogo.exe"));
+        File.WriteAllText(Path.Combine(manifests, "d.item"), item("Epic Windows", win, "notepad.exe"));
+        File.WriteAllText(Path.Combine(manifests, "e.item"), "{ \"DisplayName\": \"\\u0000\\uD800\", \"InstallLocation\": ");
+        File.WriteAllText(Path.Combine(manifests, "f.item"), item("Epic ok", epicDir, "ok.exe"));
+
+        using (var hkcu = Registry.CurrentUser.CreateSubKey(TestKey + @"\GamesAttack"))
+        {
+            object[] seen =
+            {
+                Path.Combine(sys, "cmd.exe"),                         // executável do Windows
+                Path.Combine(win, @"explorer.exe"),
+                @"\\servidor\share\jogo.exe",                         // rede
+                @"jogo.exe",                                          // relativo
+                Path.Combine(root, @"..\jogos-ataque\Steam\steamapps\common\Legitimo\Legitimo.exe"), // ".." que resolve para um jogo
+                new byte[] { 1, 2, 3 },                               // tipo errado
+                42,
+                new string('a', 5000) + ".exe"
+            };
+            for (int i = 0; i < seen.Length; i++)
+                using (var k = hkcu.CreateSubKey(@"System\GameConfigStore\Children\x" + i))
+                {
+                    if (seen[i] is int) k.SetValue("MatchedExeFullPath", seen[i], RegistryValueKind.DWord);
+                    else if (seen[i] is byte[]) k.SetValue("MatchedExeFullPath", seen[i], RegistryValueKind.Binary);
+                    else k.SetValue("MatchedExeFullPath", seen[i]);
+                }
+
+            var sources = new GameSources { Hkcu = hkcu, EpicManifests = manifests };
+            sources.SteamRoots.Add(steam);
+            List<InstalledGame> games = null;
+            Exception crash = null;
+            try { games = GameLibrary.Find(sources); } catch (Exception ex) { crash = ex; }
+            Check(crash == null && games != null, "manifestos binários, JSON quebrado e valores de tipo errado não derrubam a busca" + (crash != null ? ": " + crash.Message : ""));
+            games = games ?? new List<InstalledGame>();
+            var exes = games.SelectMany(g => g.Exes).ToList();
+            string names = string.Join(", ", games.Select(g => g.Name + " [" + g.Folder + "]"));
+            Check(!games.Any(g => Util.Canonical(g.Folder).StartsWith(win, StringComparison.OrdinalIgnoreCase)),
+                  "installdir absoluto, com \"..\" ou com barras não transforma o Windows em pasta de jogo (achou " + names + ")");
+            Check(!exes.Any(e => Util.Canonical(e).StartsWith(win, StringComparison.OrdinalIgnoreCase)),
+                  "nenhum executável do Windows vira jogo, nem pelo registro de jogos, nem por manifesto da Epic (" + string.Join(", ", exes.Where(e => e.StartsWith(win, StringComparison.OrdinalIgnoreCase))) + ")");
+            Check(!junction || !exes.Any(e => e.IndexOf(@"\Juncao\", StringComparison.OrdinalIgnoreCase) >= 0),
+                  "pasta de jogo que é junção para o System32 não expõe os executáveis do sistema" + (junction ? "" : " (junção não criada)"));
+            Check(!exes.Any(e => e.StartsWith(@"\\")) && exes.All(Path.IsPathRooted), "caminhos de rede e relativos ficam de fora");
+            Check(games.Any(g => g.Name == "Legítimo") && games.Any(g => g.Name == "Epic ok"), "os jogos legítimos continuam aparecendo no meio dos ataques");
+            Check(exes.Count(e => e.EndsWith("Legitimo.exe")) == 1, "o \"..\" do registro de jogos que aponta para um jogo real não duplica o executável");
+        }
+
+        // Preferência de GPU: valores estranhos não quebram e não viram outra coisa.
+        string[] garbage = { "", ";;;", "GpuPreference=abc;", "GpuPreference=;X=1;", "=;=;", "gpupreference=1;", "GpuPreference=2;GpuPreference=1;", new string(';', 10000) };
+        bool mergeOk = garbage.All(g =>
+        {
+            string m = GpuPreference.Merge(g, GpuPreference.HighPerformance);
+            return m != null && m.StartsWith("GpuPreference=2;") && m.Split(';').Count(p => p.StartsWith("GpuPreference=", StringComparison.OrdinalIgnoreCase)) == 1;
+        });
+        Check(mergeOk, "Merge com valores malformados sempre deixa um único GpuPreference=2");
+
+        // Páginas do Windows: só as do catálogo, escritas exatamente.
+        string[] fakes = { "ms-settings:gaming-gamedvr ", "MS-SETTINGS:gaming-gamedvr", "ms-settings:gaming-gamedvr&x=1", "ms-settings:display-advancedgraphics\"", " main.cpl",
+                           "main.cpl,,2", "control.exe", "windowsdefender://coreisolation/../threat", "file:///C:/Windows/System32/cmd.exe", "ms-windows-store://pdp/?ProductId=X" };
+        Check(fakes.All(f => !GameContext.OpenSettings(f)), "variações das páginas do catálogo (espaço, maiúsculas, parâmetros, aspas, file://) são recusadas");
+        Func<string, bool> store = GameContext.System().OpenStore;
+        Check(!store("ms-windows-store://home") && !store("https://apps.microsoft.com/detail/9WZDNCRD1HKW") && !store("calc.exe"),
+              "a Store só abre endereços ms-windows-store://pdp/?ProductId=");
+
+        // Serviços com nome que não pode ir para o Gerenciador de Serviços.
+        using (var hklm = Registry.CurrentUser.CreateSubKey(TestKey + @"\SvcAttack\HKLM"))
+        using (var hkcu = Registry.CurrentUser.CreateSubKey(TestKey + @"\SvcAttack\HKCU"))
+        {
+            string google = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"Google\GoogleUpdater\1\updater.exe");
+            foreach (var n in new[] { "GoogleUpdater evil&calc", "GoogleUpdater\"x", "GoogleUpdaterOk1.0" })
+                using (var k = hklm.CreateSubKey(@"SYSTEM\CurrentControlSet\Services\" + n))
+                {
+                    k.SetValue("Start", 4, RegistryValueKind.DWord);
+                    k.SetValue("ImagePath", "\"" + google + "\" --system");
+                }
+            var calls = new List<string>();
+            var ctx = new GameContext { Hklm = hklm, Hkcu = hkcu, SetServiceStart = (n, s, d) => { calls.Add(n); return true; } };
+            var chrome = GameScanner.Scan(ctx).FirstOrDefault(f => f.Id == "chrome-updates");
+            if (chrome != null) GameScanner.Fix(chrome);
+            Check(chrome != null && calls.SequenceEqual(new[] { "GoogleUpdaterOk1.0" }),
+                  "nomes de serviço com espaço, & ou aspas nem chegam a ser oferecidos (chamou: " + string.Join(", ", calls) + ")");
+        }
+
+        // Registro com tipos errados e chaves estranhas em todos os lugares que o scanner lê.
+        var rnd = new Random(11);
+        int crashes = 0;
+        string[] keys =
+        {
+            @"Software\Microsoft\GameBar", @"SOFTWARE\Policies\Microsoft\Windows\GameDVR", @"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications",
+            @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes", @"SYSTEM\CurrentControlSet\Services\gupdate", @"SYSTEM\CurrentControlSet\Services\wuauserv",
+            @"SOFTWARE\Policies\Microsoft\Windows Defender", @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System",
+            @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", @"Control Panel\Mouse", @"Software\Microsoft\DirectX\UserGpuPreferences",
+            @"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages"
+        };
+        string[] valueNames = { "AutoGameModeEnabled", "AllowAutoGameMode", "AllowGameDVR", "GlobalUserDisabled", "ActivePowerScheme", "Start", "ImagePath", "DisableAntiSpyware",
+                                "EnableLUA", "FeatureSettingsOverride", "MouseSpeed", "DirectXUserGlobalSettings", "HwSchMode", "" };
+        for (int round = 0; round < 60; round++)
+            using (var hklm = Registry.CurrentUser.CreateSubKey(TestKey + @"\Fuzz\HKLM"))
+            using (var hkcu = Registry.CurrentUser.CreateSubKey(TestKey + @"\Fuzz\HKCU"))
+            {
+                foreach (var root2 in new[] { hklm, hkcu })
+                    foreach (var kp in keys)
+                        using (var k = root2.CreateSubKey(kp))
+                        {
+                            for (int v = 0; v < 6; v++)
+                            {
+                                string name = valueNames[rnd.Next(valueNames.Length)];
+                                switch (rnd.Next(5))
+                                {
+                                    case 0: k.SetValue(name, rnd.Next(-5, 6), RegistryValueKind.DWord); break;
+                                    case 1: k.SetValue(name, (long)rnd.Next(), RegistryValueKind.QWord); break;
+                                    case 2: k.SetValue(name, new string((char)rnd.Next(32, 0x2FFF), rnd.Next(0, 300))); break;
+                                    case 3: var b = new byte[rnd.Next(0, 20)]; rnd.NextBytes(b); k.SetValue(name, b, RegistryValueKind.Binary); break;
+                                    default: k.SetValue(name, new[] { "a", "", "GpuPreference=9;" }, RegistryValueKind.MultiString); break;
+                                }
+                            }
+                            if (rnd.Next(3) == 0) k.CreateSubKey("sub" + rnd.Next(5) + "_" + rnd.Next(1000)).Dispose();
+                        }
+                var ctx = new GameContext { Hklm = hklm, Hkcu = hkcu, HasBattery = rnd.Next(2) == 0, WindowsBuild = 22631, MemoryIntegrityRunning = () => false,
+                                            SetActivePowerScheme = g => true, OpenStore = u => true, SetServiceStart = (n, s, d) => true };
+                try
+                {
+                    foreach (var f in GameScanner.Scan(ctx))
+                        if (f.Kind == GameKind.Fix && f.Edits.All(e => e.Root == hkcu || e.Root == hklm)) GameScanner.Fix(f);
+                }
+                catch { crashes++; }
+                Registry.CurrentUser.DeleteSubKeyTree(TestKey + @"\Fuzz", false);
+            }
+        Check(crashes == 0, "60 rodadas de registro aleatório (tipos errados, valores enormes, subchaves soltas): verificar e consertar sem erro");
+    }
+
+    // =====================================================================
+    // 6e. Jogos: desempenho com bibliotecas e registros grandes
+    // =====================================================================
+
+    static void GamesPerformance()
+    {
+        Section("Desempenho: jogos com bibliotecas e registros grandes");
+        string root = Path.Combine(sandbox, "jogos-muitos");
+        string steam = Path.Combine(root, "Steam");
+        string apps = Path.Combine(steam, "steamapps");
+        Directory.CreateDirectory(apps);
+        var sw = Stopwatch.StartNew();
+        for (int i = 0; i < 300; i++)
+        {
+            File.WriteAllText(Path.Combine(apps, "appmanifest_" + (1000 + i) + ".acf"),
+                "\"AppState\"\n{\n\t\"appid\"\t\t\"" + (1000 + i) + "\"\n\t\"name\"\t\t\"Jogo " + i + "\"\n\t\"installdir\"\t\t\"Jogo" + i + "\"\n}\n");
+            string g = Path.Combine(apps, @"common\Jogo" + i);
+            Write(Path.Combine(g, "Jogo" + i + ".exe"), 64);
+            Write(Path.Combine(g, @"Binaries\Win64\Jogo" + i + "-Shipping.exe"), 64);
+            Write(Path.Combine(g, "unins000.exe"), 64);
+            for (int f = 0; f < 20; f++) Write(Path.Combine(g, @"Content\Paks\pak" + f + ".pak"), 16);
+        }
+        // Um jogo com uma árvore funda e larga: a busca para no terceiro nível e em 30 executáveis.
+        string deep = Path.Combine(apps, @"common\Jogo0");
+        for (int a = 0; a < 6; a++)
+            for (int b = 0; b < 6; b++)
+                for (int c = 0; c < 6; c++)
+                    Write(Path.Combine(deep, "n" + a, "n" + b, "n" + c, "n4", "fundo.exe"), 16);
+        for (int x = 0; x < 80; x++) Write(Path.Combine(deep, "ferramentas", "t" + x + ".exe"), 16);
+        Perf("Criar 300 jogos falsos na sandbox", sw, "");
+
+        using (var hkcu = Registry.CurrentUser.CreateSubKey(TestKey + @"\GamesPerf\HKCU"))
+        using (var hklm = Registry.CurrentUser.CreateSubKey(TestKey + @"\GamesPerf\HKLM"))
+        {
+            for (int i = 0; i < 1000; i++)
+                using (var k = hkcu.CreateSubKey(@"System\GameConfigStore\Children\c" + i))
+                    k.SetValue("MatchedExeFullPath", i < 150 ? Path.Combine(apps, @"common\Jogo" + i + @"\Binaries\Win64\Jogo" + i + "-Shipping.exe")
+                                                             : Path.Combine(root, "sumiu" + i + ".exe"));
+            var sources = new GameSources { Hkcu = hkcu };
+            sources.SteamRoots.Add(steam);
+            sw = Stopwatch.StartNew();
+            var games = GameLibrary.Find(sources);
+            Perf("Encontrar 300 jogos (1000 entradas no registro de jogos)", sw, games.Count + " jogos, " + games.Sum(g => g.Exes.Count) + " executáveis");
+            Check(games.Count == 300 && sw.ElapsedMilliseconds < 10000, "300 jogos encontrados em menos de 10 s (" + sw.ElapsedMilliseconds + " ms)");
+            var g0 = games.FirstOrDefault(g => g.Name == "Jogo 0");
+            Check(g0 != null && g0.Exes.Count == 1, "jogo com executável visto pelo Windows usa só ele, mesmo com árvore funda ao lado");
+            var g200 = games.FirstOrDefault(g => g.Name == "Jogo 200");
+            Check(g200 != null && g200.Exes.Count == 2 && !g200.Exes.Any(e => e.EndsWith("unins000.exe")), "jogo sem registro do Windows: palpite acha os 2 executáveis e ignora o desinstalador");
+
+            // Palpite numa árvore funda: para no terceiro nível e em 30 executáveis.
+            using (var k = hkcu.OpenSubKey(@"System\GameConfigStore\Children", true)) k.DeleteSubKeyTree("c0", false);
+            sw = Stopwatch.StartNew();
+            var again = GameLibrary.Find(sources).First(g => g.Name == "Jogo 0");
+            Perf("Palpite de executáveis numa árvore de 4 níveis com 296 .exe", sw, again.Exes.Count + " executáveis");
+            Check(again.Exes.Count <= 30 && !again.Exes.Any(e => e.EndsWith(@"n4\fundo.exe")), "palpite limitado a 30 executáveis e 3 níveis abaixo da pasta do jogo");
+
+            sw = Stopwatch.StartNew();
+            for (int i = 0; i < 300; i++) GpuPreference.Set(hkcu, Path.Combine(apps, @"common\Jogo" + i + @"\Jogo" + i + ".exe"), GpuPreference.HighPerformance);
+            int high = games.Count(g => GpuPreference.StateOf(hkcu, g) == GpuPreference.HighPerformance);
+            Perf("Gravar e ler a GPU de 300 jogos", sw, high + " em alto desempenho");
+            Check(sw.ElapsedMilliseconds < 3000, "gravar e ler a preferência de 300 jogos em menos de 3 s");
+
+            for (int i = 0; i < 2000; i++)
+                using (var k = hkcu.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications\App" + i))
+                {
+                    k.SetValue("Disabled", 1, RegistryValueKind.DWord);
+                    k.SetValue("DisabledByUser", 1, RegistryValueKind.DWord);
+                }
+            for (int i = 0; i < 500; i++) hklm.CreateSubKey(@"SYSTEM\CurrentControlSet\Services\Svc" + i).Dispose();
+            for (int i = 0; i < 500; i++) hkcu.CreateSubKey(@"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages\Pkg" + i + "_1.0_x64__x").Dispose();
+            var ctx = new GameContext { Hklm = hklm, Hkcu = hkcu, HasBattery = true, WindowsBuild = 22631, MemoryIntegrityRunning = () => false };
+            sw = Stopwatch.StartNew();
+            var found = GameScanner.Scan(ctx);
+            Perf("Verificar ajustes com 2000 apps, 500 serviços e 500 pacotes", sw, found.Count + " itens");
+            var bulk = found.FirstOrDefault(f => f.Id == "background-apps-bulk");
+            Check(bulk != null && bulk.Edits.Count == 4000 && sw.ElapsedMilliseconds < 3000, "2000 apps desligados um por um detectados em menos de 3 s (" + sw.ElapsedMilliseconds + " ms)");
+            sw = Stopwatch.StartNew();
+            bool ok = GameScanner.Fix(bulk);
+            Perf("Consertar 2000 apps em segundo plano", sw, "");
+            Check(ok && sw.ElapsedMilliseconds < 5000, "conserto de 4000 valores em menos de 5 s");
+        }
+
+        // PC real, só leitura: a página inteira, cinco vezes.
+        var times = new List<long>();
+        for (int i = 0; i < 5; i++)
+        {
+            sw = Stopwatch.StartNew();
+            GameScanner.Scan(GameContext.System());
+            if (GpuPreference.IsHybridLaptop(GpuPreference.Adapters(), Util.HasBattery())) GameLibrary.Find(GameSources.System());
+            times.Add(sw.ElapsedMilliseconds);
+        }
+        Perf("Página Jogos no PC real (5 vezes, só leitura)", Stopwatch.StartNew(), "mediana " + times.OrderBy(t => t).ElementAt(2) + " ms; máx " + times.Max() + " ms");
+        Check(times.Max() < 3000, "página Jogos no PC real abaixo de 3 s em todas as 5 verificações");
     }
 
     // =====================================================================

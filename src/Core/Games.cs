@@ -469,7 +469,8 @@ namespace OpenCleaner.Core
                 var all = k.GetSubKeyNames();
                 var wanted = catalog.ToList();
                 if (wildcardPrefix != null)
-                    foreach (var n in all.Where(n => n.StartsWith(wildcardPrefix, StringComparison.OrdinalIgnoreCase)))
+                    // Só nomes que o Gerenciador de Serviços aceitaria: nada de espaço, &, aspas.
+                    foreach (var n in all.Where(n => n.StartsWith(wildcardPrefix, StringComparison.OrdinalIgnoreCase) && Regex.IsMatch(n, @"^[A-Za-z0-9_.\-]+$")))
                     {
                         // GoogleUpdaterService157.0.8089.0: aceita só se o executável estiver em Program Files\Google.
                         string image;

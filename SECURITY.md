@@ -28,7 +28,7 @@ defends against. Each defense is exercised by `tests\run-real.ps1` and `tests\ru
 | **Accidental data loss** | Analysis never deletes; destructive actions ask for confirmation; passwords, cookies, history and form data start unchecked; registry fixes offer a `.reg` backup; disk analyzer and duplicate finder use the Recycle Bin |
 | **Gaming page as a way to write system settings** (it runs as administrator to fix policies and services) | The list of settings is fixed in the code, not in a rules file. Applying can only delete a value, write a known DWORD, change a service's startup type to automatic or manual, and switch to the Balanced power plan by fixed GUID. Recommendations never write; they open only the fixed pages of the catalog (`ms-settings:` pages, Windows Security, `main.cpl`) and Store links must be `ms-windows-store://pdp/?ProductId=` |
 | **Service name injection** | Service names go to the Service Control Manager (`ChangeServiceConfig`) only if they match `^[A-Za-z0-9_.-]+$` and the start type is 2 or 3. Wildcard services (`GoogleUpdater*`) are accepted only when their executable is under `Program Files\Google` |
-| **Game library entries** (Steam, Epic Games, Windows game list) | Paths with `..`, network paths, Microsoft Store packages and missing files are ignored; junctions are not followed while looking for executables. The only write is the per-user graphics preference (`HKCU`) |
+| **Game library entries** (Steam, Epic Games, Windows game list) | Paths are made canonical before use. A Steam `installdir` must be a plain folder name (no absolute path, separators or `..`); an Epic `LaunchExecutable` must stay inside the game folder; executables under the Windows folder, network and relative paths, Microsoft Store packages and missing files are ignored. A game folder that is itself a junction is not searched, and the search stops at 3 levels and 30 executables. The only write is the per-user graphics preference (`HKCU`) |
 
 ## Known limitations
 
@@ -62,8 +62,10 @@ ignorada; IDs do winget e chaves do registro validados antes de virar argumento.
 ajustes é fixa no código; aplicar só apaga um valor, grava um DWORD conhecido, muda o tipo de inicialização
 de um serviço para automático ou manual e ativa o plano Equilibrado; recomendações nunca gravam e só abrem
 páginas fixas do Windows; nomes de serviço passam por `^[A-Za-z0-9_.-]+$` antes do Gerenciador de Serviços e
-curingas (`GoogleUpdater*`) só valem com o executável em `Program Files\Google`; entradas de bibliotecas de
-jogos com `..`, caminhos de rede ou arquivos inexistentes são ignoradas. Cada defesa é testada em
+curingas (`GoogleUpdater*`) só valem com o executável em `Program Files\Google`; nas bibliotecas de jogos,
+os caminhos viram canônicos antes do uso, o `installdir` da Steam tem de ser só um nome de pasta, o
+`LaunchExecutable` da Epic tem de ficar dentro da pasta do jogo, executáveis da pasta do Windows, caminhos de
+rede ou relativos e arquivos inexistentes são ignorados, e pasta de jogo que é junção não é vasculhada. Cada defesa é testada em
 `tests\run-real.ps1` e `tests\run-installer-tests.ps1`.
 
 **Limitações conhecidas:** instalação por usuário em pasta gravável pelo usuário; executáveis sem assinatura

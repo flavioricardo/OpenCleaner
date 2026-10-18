@@ -26,6 +26,15 @@ e as versões seguem o [Versionamento Semântico](https://semver.org/lang/pt-BR/
   os jogos recompilarem os shaders e travarem nas primeiras partidas.
 - Verificação de saúde com quatro cartões e textos mais curtos.
 
+### Segurança
+
+- Descoberta de jogos endurecida contra manifestos e registros maliciosos: `installdir` da Steam só como nome
+  de pasta (um caminho absoluto fazia `C:\Windows` virar pasta de jogo), `LaunchExecutable` da Epic preso à
+  pasta do jogo, executáveis da pasta do Windows ignorados, caminhos normalizados antes de comparar, pasta de
+  jogo que é junção não é vasculhada e o limite de 30 executáveis vale dentro de cada pasta.
+- Serviços `GoogleUpdater*` com nome que o Gerenciador de Serviços não aceita (espaço, `&`, aspas) nem
+  chegam a ser oferecidos.
+
 ### Corrigido
 
 - Parágrafo duplicado e quebrado (`testsun-real.ps1`) nos READMEs.
@@ -33,7 +42,10 @@ e as versões seguem o [Versionamento Semântico](https://semver.org/lang/pt-BR/
 ### Testes
 
 - `tests/run-real.ps1`: sandboxes de registro, serviços e bibliotecas de jogos para cada item da página
-  Jogos, inclusive falsos positivos, backup, conserto e restauração.
+  Jogos, inclusive falsos positivos, backup, conserto e restauração; ataques (manifestos com caminho
+  absoluto, `..` e barras, junção para o System32, valores de tipo errado, nomes de serviço com `&`, 60
+  rodadas de registro aleatório) e desempenho (300 jogos, 1000 entradas no registro de jogos, 2000 apps em
+  segundo plano, árvore funda de executáveis).
 - `tests/run-smoke.ps1`: capturas da página Jogos, com um jogo de teste e uma recomendação selecionada.
 
 ## [1.0.1] - 2026-10-17
