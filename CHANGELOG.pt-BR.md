@@ -8,6 +8,8 @@ arquivo é a [em inglês](CHANGELOG.md); esta é a tradução.
 
 ## [Não lançado]
 
+## [1.2.1] - 2026-10-18
+
 ### Corrigido
 
 - Análise de disco e localizador de duplicados: escolher uma categoria não fecha mais o app com
@@ -144,7 +146,8 @@ Primeira versão pública.
 - App, instalador e desinstalador em português e inglês, com o idioma do Windows por padrão, seletor no instalador
   e em *Opções*; as seleções de limpeza salvas valem nos dois idiomas.
 
-[Não lançado]: https://github.com/flavioricardo/OpenCleaner/compare/v1.2.0...HEAD
+[Não lançado]: https://github.com/flavioricardo/OpenCleaner/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.2.1
 [1.2.0]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.2.0
 [1.1.0]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.1.0
 [1.0.1]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.0.1

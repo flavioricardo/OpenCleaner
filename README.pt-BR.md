@@ -363,7 +363,7 @@ release com o instalador, o zip e o `SHA256SUMS.txt`. Para refazer as notas de u
 o workflow *Rewrite release notes* na aba Actions.
 
 ```bash
-git tag -a v1.2.0 -m "OpenCleaner 1.2.0" && git push origin main --follow-tags
+git tag -a v1.2.1 -m "OpenCleaner 1.2.1" && git push origin main --follow-tags
 ```
 
 ### Identidade visual

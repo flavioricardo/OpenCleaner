@@ -358,7 +358,7 @@ and publishes the release with the installer, the zip and `SHA256SUMS.txt`. To r
 release that is already out, run the *Rewrite release notes* workflow from the Actions tab.
 
 ```bash
-git tag -a v1.2.0 -m "OpenCleaner 1.2.0" && git push origin main --follow-tags
+git tag -a v1.2.1 -m "OpenCleaner 1.2.1" && git push origin main --follow-tags
 ```
 
 ### Visual identity
