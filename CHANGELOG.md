@@ -1,101 +1,107 @@
 # Changelog
 
-Todas as mudanças relevantes do OpenCleaner. O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/)
-e as versões seguem o [Versionamento Semântico](https://semver.org/lang/pt-BR/).
+All notable changes to OpenCleaner. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+and versions follow [Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
+
+### Changed
+
+- The changelog and the release notes are now in English.
 
 ## [1.1.0] - 2026-10-17
 
-### Adicionado
+### Added
 
-- **Jogos** (novo item na barra lateral e cartão na Verificação de saúde): encontra e desfaz o que "game
-  boosters" deixam no Windows, com backup `.reg` antes de aplicar.
-  - Ajustes deixados por otimizadores: Modo de Jogo desligado, política que bloqueia a Xbox Game Bar, apps
-    em segundo plano proibidos, cópia do Desempenho Máximo ativa num notebook e apps do Xbox ausentes
-    (Xbox Identity Provider, Xbox TCUI, Gaming Services), que só abrem a página na Microsoft Store.
-  - Segurança: atualização automática do Chrome e do Edge desativada, Windows Update desligado, Defender
-    desligado por política, UAC desligado e proteções contra Spectre/Meltdown desligadas.
-  - Placa de vídeo dos jogos: em notebooks com duas placas, encontra os jogos (Steam, Epic Games e os que o
-    Windows já viu rodar) e os põe em *Alto desempenho*, a mesma opção das Configurações.
-  - Recomendado para jogos (só leitura, abre a página do Windows): gravação em segundo plano, agendamento de
-    GPU, otimizações para jogos em janela e precisão do ponteiro. Desempenho × segurança: Integridade de
-    Memória, só como informação.
+- **Gaming** (new sidebar item and a card on the Health check): finds and undoes what "game boosters" leave
+  behind in Windows, with a `.reg` backup before applying.
+  - Settings left by optimizers: Game Mode turned off, a policy that blocks the Xbox Game Bar, apps barred
+    from running in the background, a copy of Ultimate Performance active on a laptop, and missing Xbox apps
+    (Xbox Identity Provider, Xbox TCUI, Gaming Services), which only open their Microsoft Store page.
+  - Security: Chrome and Edge automatic updates disabled, Windows Update turned off, Defender turned off by
+    policy, UAC turned off and Spectre/Meltdown protections turned off.
+  - Graphics card for games: on laptops with two graphics cards, finds the games (Steam, Epic Games and the
+    ones Windows has seen run) and sets them to *High performance*, the same option as Settings.
+  - Recommended for gaming (read-only, opens the Windows page): background recording, GPU scheduling,
+    optimizations for windowed games and pointer precision. Performance × security: Memory integrity, as
+    information only.
 
-### Alterado
+### Changed
 
-- O cache de shaders (DirectX, NVIDIA, AMD) vem desmarcado na Limpeza personalizada, com aviso: apagá-lo faz
-  os jogos recompilarem os shaders e travarem nas primeiras partidas.
-- Verificação de saúde com quatro cartões e textos mais curtos.
+- The shader cache (DirectX, NVIDIA, AMD) starts unchecked in Custom clean, with a warning: deleting it makes
+  games recompile their shaders and stutter for the first few matches.
+- Health check with four cards and shorter texts.
 
-### Segurança
+### Security
 
-- Descoberta de jogos endurecida contra manifestos e registros maliciosos: `installdir` da Steam só como nome
-  de pasta (um caminho absoluto fazia `C:\Windows` virar pasta de jogo), `LaunchExecutable` da Epic preso à
-  pasta do jogo, executáveis da pasta do Windows ignorados, caminhos normalizados antes de comparar, pasta de
-  jogo que é junção não é vasculhada e o limite de 30 executáveis vale dentro de cada pasta.
-- Serviços `GoogleUpdater*` com nome que o Gerenciador de Serviços não aceita (espaço, `&`, aspas) nem
-  chegam a ser oferecidos.
+- Game discovery hardened against malicious manifests and registry entries: a Steam `installdir` is accepted
+  only as a folder name (an absolute path turned `C:\Windows` into a game folder), an Epic `LaunchExecutable`
+  must stay inside the game folder, executables under the Windows folder are ignored, paths are normalized
+  before comparing, a game folder that is a junction is not searched, and the 30-executable limit applies
+  within each folder.
+- `GoogleUpdater*` services whose names the Service Control Manager would not accept (spaces, `&`, quotes)
+  are never offered.
 
-### Corrigido
+### Fixed
 
-- Parágrafo duplicado e quebrado (`testsun-real.ps1`) nos READMEs.
+- Duplicated, broken paragraph (`testsun-real.ps1`) in the READMEs.
 
-### Testes
+### Tests
 
-- `tests/run-real.ps1`: sandboxes de registro, serviços e bibliotecas de jogos para cada item da página
-  Jogos, inclusive falsos positivos, backup, conserto e restauração; ataques (manifestos com caminho
-  absoluto, `..` e barras, junção para o System32, valores de tipo errado, nomes de serviço com `&`, 60
-  rodadas de registro aleatório) e desempenho (300 jogos, 1000 entradas no registro de jogos, 2000 apps em
-  segundo plano, árvore funda de executáveis).
-- `tests/run-smoke.ps1`: capturas da página Jogos, com um jogo de teste e uma recomendação selecionada, e
-  *Aplicar marcados* de ponta a ponta contra uma sandbox do registro (com e sem administrador, backup e
-  cancelamento).
-- `tests/run-admin-tests.ps1`: troca real do tipo de inicialização de um serviço de teste temporário pelo
-  Gerenciador de Serviços (rodar como administrador).
+- `tests/run-real.ps1`: registry, service and game-library sandboxes for every Gaming item, including false
+  positives, backup, fix and restore; attacks (manifests with absolute paths, `..` and separators, a junction
+  to System32, wrong value types, service names with `&`, 60 rounds of random registry data) and performance
+  (300 games, 1000 entries in the Windows game list, 2000 background apps, a deep tree of executables).
+- `tests/run-smoke.ps1`: screenshots of the Gaming page, with a test game and a selected recommendation, and
+  *Apply checked* end to end against a registry sandbox (with and without administrator, backup and cancel).
+- `tests/run-admin-tests.ps1`: real startup-type changes of a temporary test service through the Service
+  Control Manager (run as administrator).
 
 ## [1.0.1] - 2026-10-17
 
-### Segurança
+### Security
 
-- Antes de apagar cada arquivo, confere se alguma pasta entre ele e a pasta-base virou junção ou link
-  depois da análise (impede que uma limpeza como administrador apague arquivos do sistema).
-- Caminhos das regras passam a ser canônicos (`..`, `.`, barras duplicadas, ponto final, nomes 8.3 e
-  prefixos `\\?\`) antes de comparar com as pastas protegidas.
-- Recusa regras "apagar tudo" logo abaixo do perfil (Downloads, OneDrive, projetos), da raiz da unidade
-  ou de pastas protegidas (`%AppData%\*`); Downloads, OneDrive e os backups do próprio app viram protegidos.
-- Exclusão segura não sobrescreve arquivos com mais de um link físico.
-- O Localizador de duplicados ignora arquivos só na nuvem e offline, em vez de baixá-los.
-- App e instalador só carregam DLLs do System32 (proteção contra DLL plantada).
-- IDs do winget e chaves de registro são validados antes de virarem argumento de linha de comando.
-- `SECURITY.md` com o modelo de ameaças e como reportar vulnerabilidades.
+- Before deleting each file, checks whether any folder between it and the base folder became a junction or
+  link after the analysis (stops a cleanup running as administrator from deleting system files).
+- Rule paths are made canonical (`..`, `.`, duplicate backslashes, trailing dots, 8.3 names and `\\?\`
+  prefixes) before being compared with the protected folders.
+- Refuses "delete everything" rules right under the user profile (Downloads, OneDrive, projects), a drive root
+  or a protected folder (`%AppData%\*`); Downloads, OneDrive and the app's own backups become protected.
+- Secure deletion does not overwrite files with more than one hard link.
+- The Duplicate finder skips cloud-only and offline files instead of downloading them.
+- The app and the installer only load DLLs from System32 (DLL planting protection).
+- winget IDs and registry keys are validated before becoming command-line arguments.
+- `SECURITY.md` with the threat model and how to report vulnerabilities.
 
-### Testes
+### Tests
 
-- `tests/run-real.ps1`: todas as regras executadas numa sandbox, ataques ao motor, registro, inicialização,
-  desinstalador, disco, duplicados, winget, drivers, `/AUTO`, robustez e desempenho.
-- `tests/run-installer-tests.ps1`: instalação, atualização com o app aberto, DLL plantada e desinstalação.
+- `tests/run-real.ps1`: every rule run in a sandbox, attacks on the engine, registry, startup, uninstaller,
+  disk, duplicates, winget, drivers, `/AUTO`, robustness and performance.
+- `tests/run-installer-tests.ps1`: install, update with the app open, planted DLLs and uninstall.
 
 ## [1.0.0] - 2026-10-17
 
-Primeira versão pública.
+First public release.
 
-### Adicionado
+### Added
 
-- **Verificação de saúde** com medidor de espaço do disco do sistema (usado, pode ser liberado e livre)
-  e resumo de registro, inicialização e atualizações.
-- **Limpeza personalizada** com mais de 70 regras embutidas (Windows, navegadores Chromium e Firefox,
-  aplicativos), detecção dos programas instalados, aviso de programas abertos, pastas personalizadas,
-  exclusões, opção de manter temporários com menos de 24 horas, exclusão segura e suporte a `winapp2.ini`.
-- **Registro**: sete categorias de entradas órfãs, com backup `.reg` antes de corrigir.
-- **Atualizar programas** pelo winget e **Atualizar drivers** pelo Windows Update, com ponto de
-  restauração antes de instalar drivers.
-- **Desinstalar programas**, **Inicialização**, **Analisador de disco** e **Localizador de duplicados**.
-- Modo silencioso `/AUTO` para limpeza agendada.
-- Instalador por usuário (sem administrador) com desinstalação em *Configurações > Apps*, versão
-  portátil e somas SHA-256.
-- Interface com navegação por teclado, foco visível, contraste AA e escala por DPI.
-- App, instalador e desinstalador em português e inglês, com o idioma do Windows por padrão, seletor no instalador
-  e em *Opções*; as seleções de limpeza salvas valem nos dois idiomas.
+- **Health check** with a system drive meter (used, can be freed and free) and a summary of registry,
+  startup and updates.
+- **Custom clean** with more than 70 built-in rules (Windows, Chromium and Firefox browsers, applications),
+  detection of installed programs, a warning about open programs, custom folders, exclusions, an option to
+  keep temporary files newer than 24 hours, secure deletion and `winapp2.ini` support.
+- **Registry**: seven categories of orphaned entries, with a `.reg` backup before fixing.
+- **Update programs** through winget and **Update drivers** through Windows Update, with a restore point
+  before installing drivers.
+- **Uninstall programs**, **Startup**, **Disk analyzer** and **Duplicate finder**.
+- Silent `/AUTO` mode for scheduled cleaning.
+- Per-user installer (no administrator) with uninstall from *Settings > Apps*, a portable version and SHA-256
+  sums.
+- Interface with keyboard navigation, visible focus, AA contrast and DPI scaling.
+- App, installer and uninstaller in Portuguese and English, following the Windows language by default, with a
+  selector in the installer and in *Options*; saved cleaning selections work in both languages.
 
+[Unreleased]: https://github.com/flavioricardo/OpenCleaner/compare/v1.1.0...HEAD
 [1.1.0]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.1.0
 [1.0.1]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.0.1
 [1.0.0]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.0.0
