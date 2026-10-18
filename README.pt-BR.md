@@ -325,6 +325,7 @@ powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1   # gera 
 powershell -ExecutionPolicy Bypass -File tests\run-smoke.ps1             # teste de fumaça
 powershell -ExecutionPolicy Bypass -File tests\run-real.ps1              # testes reais: funcionais, de segurança e de desempenho
 powershell -ExecutionPolicy Bypass -File tests\run-installer-tests.ps1   # instala, atualiza e desinstala de verdade
+powershell -ExecutionPolicy Bypass -File tests\run-admin-tests.ps1       # como administrador: troca real do tipo de inicialização de serviço
 ```
 
 O teste de fumaça analisa (sem apagar) todas as regras detectadas, faz uma limpeza real numa pasta
@@ -337,7 +338,11 @@ cada regra, cria entradas de registro e de inicialização chamadas `OpenCleaner
 ataca o motor (troca por junção, links físicos, regras maliciosas, DLL plantada) e mede o desempenho no disco
 real, só lendo. Os testes de Jogos usam sandboxes de registro, serviços e bibliotecas de jogos em
 `HKCU\Software\OpenCleanerTest` e `%TEMP%`; nada muda no PC de verdade. O `tests\run-installer-tests.ps1`
-instala, atualiza com o app aberto e desinstala de verdade, preservando as suas configurações.
+instala, atualiza com o app aberto e desinstala de verdade, preservando as suas configurações. O teste de
+fumaça também clica em *Aplicar marcados* na página Jogos contra uma sandbox do registro, respondendo ele
+mesmo aos diálogos. O `tests\run-admin-tests.ps1` (rode num PowerShell aberto como administrador) cria um
+serviço temporário, que nunca é iniciado, chamado `OpenCleanerTestSvc`, troca o tipo de inicialização dele pelo
+mesmo código da página Jogos e o remove no final; nenhum serviço real é tocado.
 
 ```
 src/Core/       motor: regras (formato winapp2), limpeza, registro, atualizadores, ferramentas, jogos, configurações

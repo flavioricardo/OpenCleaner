@@ -34,6 +34,129 @@ static class SmokeTest
         }
     }
 
+    static IEnumerable<Label> AllLabels(Control root)
+    {
+        foreach (Control c in root.Controls)
+        {
+            if (c is Label && c.Visible) yield return (Label)c;
+            foreach (var l in AllLabels(c)) yield return l;
+        }
+    }
+
+    /// <summary>
+    /// "Aplicar marcados" de ponta a ponta, clicando no botão de verdade, contra uma sandbox do registro
+    /// (HKCU\Software\OpenCleanerTest): os diálogos são respondidos pelo teste e nada do PC real é tocado.
+    /// </summary>
+    static void GamesApplyEndToEnd(OpenCleaner.UI.MainForm form, string outDir, Action<double> pump, Action<string> shot)
+    {
+        Console.WriteLine("== Jogos: Aplicar marcados de ponta a ponta (sandbox) ==");
+        const string root = @"Software\OpenCleanerTest\SmokeApply";
+        var cu = Microsoft.Win32.Registry.CurrentUser;
+        string exe = Path.Combine(outDir, @"jogo-e2e\JogoE2E.exe");
+        string backup = Path.Combine(outDir, "e2e-backup.reg");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(exe));
+            File.WriteAllBytes(exe, new byte[] { 0x4D, 0x5A });
+            if (File.Exists(backup)) File.Delete(backup);
+            var hklm = cu.CreateSubKey(root + @"\HKLM");
+            var hkcu = cu.CreateSubKey(root + @"\HKCU");
+            Action<Microsoft.Win32.RegistryKey, string, string, int> dword = (r, k, n, v) => { using (var x = r.CreateSubKey(k)) x.SetValue(n, v, Microsoft.Win32.RegistryValueKind.DWord); };
+            Func<Microsoft.Win32.RegistryKey, string, string, object> value = (r, k, n) => { using (var x = r.OpenSubKey(k)) return x == null ? null : x.GetValue(n); };
+            const string gameBar = @"Software\Microsoft\GameBar", dvr = @"SOFTWARE\Policies\Microsoft\Windows\GameDVR";
+            const string schemes = @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes", nich = "243ed252-7df6-4cfa-90ad-c9a5f636f763";
+            dword(hkcu, gameBar, "AutoGameModeEnabled", 0);
+            dword(hklm, dvr, "AllowGameDVR", 0);
+            using (var k = hklm.CreateSubKey(schemes))
+            {
+                k.SetValue("ActivePowerScheme", nich);
+                using (var s = k.CreateSubKey(nich)) s.SetValue("Description", @"@%SystemRoot%\system32\powrprof.dll,-18,Provides ultimate performance on higher end PCs.");
+            }
+            using (var k = hkcu.CreateSubKey(@"Control Panel\Mouse")) k.SetValue("MouseSpeed", "1");
+            using (var k = hkcu.CreateSubKey(@"System\GameConfigStore\Children\e2e")) k.SetValue("MatchedExeFullPath", exe);
+            // Preferência de GPU de outro programa, que já existia: entra no backup e não pode ser tocada.
+            using (var k = hkcu.CreateSubKey(GpuPreference.Key)) k.SetValue(@"C:\Outro\programa.exe", "GpuPreference=1;");
+
+            string activated = null;
+            bool admin = false;
+            var questions = new List<string>();
+            var answers = new Queue<DialogResult>();
+            OpenCleaner.UI.GamesPage.Hooks.Context = () => new GameContext
+            {
+                Hklm = hklm, Hkcu = hkcu, HasBattery = true, WindowsBuild = 22631, MemoryIntegrityRunning = () => false,
+                SetActivePowerScheme = g => { activated = g; return true; }, OpenStore = u => true, SetServiceStart = (n, s, d) => true
+            };
+            OpenCleaner.UI.GamesPage.Hooks.Sources = () => new GameSources { Hkcu = hkcu };
+            OpenCleaner.UI.GamesPage.Hooks.Hybrid = () => true;
+            OpenCleaner.UI.GamesPage.Hooks.GpuRoot = () => hkcu;
+            OpenCleaner.UI.GamesPage.Hooks.IsAdmin = () => admin;
+            OpenCleaner.UI.GamesPage.Hooks.Ask = (text, buttons) => { questions.Add(text); return answers.Count > 0 ? answers.Dequeue() : DialogResult.Cancel; };
+            OpenCleaner.UI.GamesPage.Hooks.PickBackup = suggested => backup;
+
+            Func<string> status = () => string.Join(" | ", AllLabels(form).Select(l => l.Text).Where(t => t.Contains("aplicados") || t.Contains("ajuste")));
+            Action click = () => { var b = FindButton(form, "Aplicar marcados"); if (b != null && b.Enabled) b.PerformClick(); pump(2.5); };
+            form.Navigate("games");
+            var again = FindButton(form, "Verificar de novo");
+            if (again != null) again.PerformClick();
+            pump(2.5);
+            var items = AllLists(form).SelectMany(l => l.Items.Cast<ListViewItem>()).Where(i => i.Tag is GameFinding || i.Tag is InstalledGame).ToList();
+            var ids = items.Select(i => i.Tag is GameFinding ? ((GameFinding)i.Tag).Id : i.Tag is InstalledGame ? "jogo" : "?").ToList();
+            Check(ids.Contains("game-mode-off") && ids.Contains("gamedvr-policy") && ids.Contains("power-plan-copy") && ids.Contains("jogo") && ids.Contains("mouse-precision"),
+                  "e2e: a página lê só a sandbox (achou " + string.Join(", ", ids) + ")");
+
+            // 1. Sem administrador: responde "Não" (só os itens do usuário) e "Sim" ao backup.
+            answers.Enqueue(DialogResult.No);
+            answers.Enqueue(DialogResult.Yes);
+            click();
+            Check(questions.Count == 2 && questions[0].Contains("administrador") && questions[1].Contains("backup"), "e2e: pergunta sobre administrador e depois sobre o backup (" + questions.Count + " perguntas)");
+            Check(Equals(value(hkcu, gameBar, "AutoGameModeEnabled"), 1), "e2e: Modo de Jogo religado na sandbox");
+            Check(Equals(value(hkcu, GpuPreference.Key, exe), "GpuPreference=2;") && Equals(value(hkcu, GpuPreference.Key, @"C:\Outro\programa.exe"), "GpuPreference=1;"),
+                  "e2e: jogo posto em alto desempenho; a preferência de outro programa continua igual");
+            Check(Equals(value(hklm, dvr, "AllowGameDVR"), 0), "e2e: com \"Não\", a política em HKLM (item de administrador) fica como estava");
+            Check(activated == "381b4222-f694-41f0-9685-ff5bb260df2e", "e2e: troca de plano (não pede administrador) pede o Equilibrado");
+            Check(Equals(value(hkcu, @"Control Panel\Mouse", "MouseSpeed"), "1"), "e2e: recomendação (precisão do ponteiro) não foi tocada");
+            string reg = File.Exists(backup) ? File.ReadAllText(backup, System.Text.Encoding.Unicode) : "";
+            var regKeys = reg.Split('\n').Where(l => l.StartsWith("[")).Select(l => l.Trim()).ToList();
+            Check(regKeys.Any(k => k.EndsWith(@"\GameBar]")) && regKeys.Any(k => k.EndsWith(@"\UserGpuPreferences]")) && !regKeys.Any(k => k.EndsWith(@"\GameDVR]")),
+                  "e2e: backup .reg só com o que foi alterado (chaves: " + string.Join(" ", regKeys.Select(k => k.Substring(k.LastIndexOf('\\') + 1))) + ")");
+            Check(status().Contains("3 itens aplicados"), "e2e: status diz quantos itens foram aplicados (" + status() + ")");
+            shot("games-e2e");
+
+            // 2. Como administrador: os itens do sistema vão, sem a pergunta de administrador; sem backup.
+            questions.Clear();
+            admin = true;
+            answers.Enqueue(DialogResult.No);
+            click();
+            Check(questions.Count == 1 && questions[0].Contains("backup"), "e2e: como administrador, só a pergunta do backup");
+            Check(value(hklm, dvr, "AllowGameDVR") == null, "e2e: como administrador, a política em HKLM é apagada");
+
+            // 3. Cancelar no backup não muda nada.
+            dword(hkcu, gameBar, "AutoGameModeEnabled", 0);
+            again = FindButton(form, "Verificar de novo");
+            if (again != null) again.PerformClick();
+            pump(2.5);
+            questions.Clear();
+            answers.Enqueue(DialogResult.Cancel);
+            click();
+            Check(questions.Count == 1 && Equals(value(hkcu, gameBar, "AutoGameModeEnabled"), 0), "e2e: Cancelar no backup não muda nada");
+            hklm.Dispose(); hkcu.Dispose();
+        }
+        finally
+        {
+            OpenCleaner.UI.GamesPage.Hooks.Reset();
+            try { cu.DeleteSubKeyTree(root, false); } catch { }
+            try
+            {
+                bool empty;
+                using (var k = cu.OpenSubKey(@"Software\OpenCleanerTest")) empty = k != null && k.SubKeyCount == 0 && k.ValueCount == 0;
+                if (empty) cu.DeleteSubKey(@"Software\OpenCleanerTest", false);
+            }
+            catch { }
+            try { Directory.Delete(Path.GetDirectoryName(exe), true); } catch { }
+            try { File.Delete(backup); } catch { }
+        }
+    }
+
     static Button FindButton(Control root, string text)
     {
         foreach (Control c in root.Controls)
@@ -323,6 +446,8 @@ static class SmokeTest
             try { Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(fakeKey, false); } catch { }
             try { using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(GpuPreference.Key, true)) if (k != null) k.DeleteValue(fakeGame, false); } catch { }
         }
+
+        GamesApplyEndToEnd(form, outDir, pump, shot);
 
         run("home", "Verificar agora", "Verificar de novo", 120);
         run("clean", "Analisar", null, 120);

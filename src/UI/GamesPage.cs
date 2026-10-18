@@ -15,6 +15,41 @@ namespace OpenCleaner.UI
     /// </summary>
     class GamesPage : Page
     {
+        /// <summary>
+        /// Pontos de troca para o teste de fumaça: de onde a página lê, onde grava e como pergunta ao usuário.
+        /// No app ficam sempre nos valores padrão (o PC de verdade e os diálogos do Windows).
+        /// </summary>
+        public static class Hooks
+        {
+            public static Func<GameContext> Context;
+            public static Func<GameSources> Sources;
+            public static Func<bool> Hybrid;
+            public static Func<RegistryKey> GpuRoot;
+            public static Func<bool> IsAdmin;
+            /// <summary>Responde às perguntas (texto, botões); null = MessageBox.</summary>
+            public static Func<string, MessageBoxButtons, DialogResult> Ask;
+            /// <summary>Caminho do backup sugerido -> caminho escolhido (null cancela); null = SaveFileDialog.</summary>
+            public static Func<string, string> PickBackup;
+
+            static Hooks() { Reset(); }
+
+            public static void Reset()
+            {
+                Context = GameContext.System;
+                Sources = GameSources.System;
+                Hybrid = () => GpuPreference.IsHybridLaptop(GpuPreference.Adapters(), Util.HasBattery());
+                GpuRoot = () => Registry.CurrentUser;
+                IsAdmin = Util.IsAdmin;
+                Ask = null;
+                PickBackup = null;
+            }
+        }
+
+        DialogResult AskUser(string text, string title, MessageBoxButtons buttons, MessageBoxIcon icon)
+        {
+            return Hooks.Ask != null ? Hooks.Ask(text, buttons) : MessageBox.Show(this, text, title, buttons, icon);
+        }
+
         readonly ListCard results;
         readonly Label why;
         readonly LinkLabel openSettings;
@@ -175,12 +210,12 @@ namespace OpenCleaner.UI
             bool hybrid = false;
             RunBackground(() =>
             {
-                findings = GameScanner.Scan(GameContext.System());
-                var adapters = GpuPreference.Adapters();
-                hybrid = GpuPreference.IsHybridLaptop(adapters, Util.HasBattery());
-                adaptersText = string.Join(" + ", adapters.Select(a => a.Name));
-                games = hybrid ? GameLibrary.Find(GameSources.System()) : new List<InstalledGame>();
-                foreach (var g in games) states[g] = GpuPreference.StateOf(Registry.CurrentUser, g);
+                findings = GameScanner.Scan(Hooks.Context());
+                hybrid = Hooks.Hybrid();
+                if (hybrid) adaptersText = string.Join(" + ", GpuPreference.Adapters().Select(a => a.Name));
+                games = hybrid ? GameLibrary.Find(Hooks.Sources()) : new List<InstalledGame>();
+                var gpuRoot = Hooks.GpuRoot();
+                foreach (var g in games) states[g] = GpuPreference.StateOf(gpuRoot, g);
             }, () =>
             {
                 busy = false;
@@ -257,9 +292,9 @@ namespace OpenCleaner.UI
 
             // Políticas em HKLM exigem administrador; o resto é do usuário atual.
             Func<ListViewItem, bool> admin = i => { var f = i.Tag as GameFinding; return f != null && f.NeedsAdmin; };
-            if (!Util.IsAdmin() && items.Any(admin))
+            if (!Hooks.IsAdmin() && items.Any(admin))
             {
-                var answer = MessageBox.Show(this,
+                var answer = AskUser(
                     L.T("Alguns itens marcados são do sistema e só podem ser alterados com permissão de administrador.\n\n", "Some checked items belong to the system and can only be changed with administrator permission.\n\n") +
                     L.T("Sim: reiniciar o OpenCleaner como administrador\nNão: aplicar só os itens do usuário atual\nCancelar: voltar", "Yes: restart OpenCleaner as administrator\nNo: apply only the current user's items\nCancel: go back"),
                     L.T("Permissão de administrador", "Administrator permission"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Information);
@@ -271,32 +306,27 @@ namespace OpenCleaner.UI
             var findings = items.Select(i => i.Tag).OfType<GameFinding>().Where(f => f.Kind == GameKind.Fix).ToList();
             var games = items.Select(i => i.Tag).OfType<InstalledGame>().ToList();
 
+            var gpuRoot = Hooks.GpuRoot();
             var keys = GameScanner.BackupKeys(findings).ToList();
-            if (games.Count > 0) keys.Add(new KeyValuePair<string, RegistryView>(@"HKCU\" + GpuPreference.Key, RegistryView.Default));
+            if (games.Count > 0) keys.Add(new KeyValuePair<string, RegistryView>(gpuRoot.Name + "\\" + GpuPreference.Key, gpuRoot.View));
             // Abrir a Store ou trocar o plano de energia não mexe no registro: aí não há o que salvar.
             var backup = keys.Count == 0 ? DialogResult.No
-                : MessageBox.Show(this, L.T("Salvar um backup (.reg) do que vai mudar?\nCom ele dá para desfazer depois.", "Save a backup (.reg) of what will change?\nIt lets you undo it later."),
-                                  L.T("Backup", "Backup"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                : AskUser(L.T("Salvar um backup (.reg) do que vai mudar?\nCom ele dá para desfazer depois.", "Save a backup (.reg) of what will change?\nIt lets you undo it later."),
+                          L.T("Backup", "Backup"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
             if (backup == DialogResult.Cancel) return;
             if (backup == DialogResult.Yes)
             {
                 string dir = Path.Combine(AppSettings.DataDir, "Backups");
-                Directory.CreateDirectory(dir);
-                using (var d = new SaveFileDialog
-                {
-                    InitialDirectory = dir, Filter = L.T("Arquivo de registro (*.reg)|*.reg", "Registry file (*.reg)|*.reg"),
-                    FileName = "jogos-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".reg"
-                })
-                {
-                    if (d.ShowDialog(this) != DialogResult.OK) return;
-                    Cursor = Cursors.WaitCursor;
-                    string error;
-                    bool ok = Util.ExportRegistry(keys, d.FileName, out error);
-                    Cursor = Cursors.Default;
-                    if (!ok && MessageBox.Show(this, L.T("O backup não foi salvo: ", "The backup was not saved: ") + error + L.T("\n\nAplicar mesmo assim?", "\n\nApply anyway?"),
-                                               L.T("Backup", "Backup"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-                        return;
-                }
+                string suggested = Path.Combine(dir, "jogos-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".reg");
+                string target = PickBackupFile(suggested);
+                if (target == null) return;
+                Cursor = Cursors.WaitCursor;
+                string error;
+                bool saved = Util.ExportRegistry(keys, target, out error);
+                Cursor = Cursors.Default;
+                if (!saved && AskUser(L.T("O backup não foi salvo: ", "The backup was not saved: ") + error + L.T("\n\nAplicar mesmo assim?", "\n\nApply anyway?"),
+                                      L.T("Backup", "Backup"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                    return;
             }
 
             int done = 0, failed = 0;
@@ -306,7 +336,7 @@ namespace OpenCleaner.UI
             foreach (var g in games)
             {
                 bool ok = true;
-                foreach (var exe in g.Exes) ok &= GpuPreference.Set(Registry.CurrentUser, exe, GpuPreference.HighPerformance);
+                foreach (var exe in g.Exes) ok &= GpuPreference.Set(gpuRoot, exe, GpuPreference.HighPerformance);
                 if (ok) done++; else failed++;
             }
             Cursor = Cursors.Default;
@@ -321,8 +351,22 @@ namespace OpenCleaner.UI
         {
             var g = SelectedGame();
             if (g == null || busy) return;
-            foreach (var exe in g.Exes) GpuPreference.Set(Registry.CurrentUser, exe, GpuPreference.WindowsDecides);
+            var gpuRoot = Hooks.GpuRoot();
+            foreach (var exe in g.Exes) GpuPreference.Set(gpuRoot, exe, GpuPreference.WindowsDecides);
             Scan();
+        }
+
+        /// <summary>Onde salvar o backup; null se o usuário cancelar.</summary>
+        string PickBackupFile(string suggested)
+        {
+            if (Hooks.PickBackup != null) return Hooks.PickBackup(suggested);
+            Directory.CreateDirectory(Path.GetDirectoryName(suggested));
+            using (var d = new SaveFileDialog
+            {
+                InitialDirectory = Path.GetDirectoryName(suggested), FileName = Path.GetFileName(suggested),
+                Filter = L.T("Arquivo de registro (*.reg)|*.reg", "Registry file (*.reg)|*.reg")
+            })
+                return d.ShowDialog(this) == DialogResult.OK ? d.FileName : null;
         }
     }
 }

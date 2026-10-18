@@ -320,6 +320,7 @@ powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1   # build
 powershell -ExecutionPolicy Bypass -File tests\run-smoke.ps1             # smoke test
 powershell -ExecutionPolicy Bypass -File tests\run-real.ps1              # real functional, security and performance tests
 powershell -ExecutionPolicy Bypass -File tests\run-installer-tests.ps1   # installs, updates and uninstalls for real
+powershell -ExecutionPolicy Bypass -File tests\run-admin-tests.ps1       # as administrator: real service startup-type changes
 ```
 
 The smoke test analyzes (without deleting) every detected rule, runs a real cleanup in a sandbox folder in
@@ -332,7 +333,11 @@ creates registry and startup entries named `OpenCleanerTest` (removed at the end
 (junction swaps, hard links, malicious rules, planted DLLs) and measures performance on the real disk,
 read-only. The Gaming checks run against registry, service and game-library sandboxes under
 `HKCU\Software\OpenCleanerTest` and `%TEMP%`; nothing on the real PC changes. `tests\run-installer-tests.ps1`
-installs, updates with the app open and uninstalls for real, keeping your settings.
+installs, updates with the app open and uninstalls for real, keeping your settings. The smoke test also
+clicks *Apply checked* on the Gaming page against a registry sandbox, answering the dialogs itself.
+`tests\run-admin-tests.ps1` (run it from an administrator PowerShell) creates a temporary, never-started
+service called `OpenCleanerTestSvc`, changes its startup type through the same code the Gaming page uses and
+removes it at the end; no real service is touched.
 
 ```
 src/Core/       engine: rules (winapp2 format), cleaning, registry, updaters, tools, gaming, settings, languages

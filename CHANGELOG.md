@@ -46,7 +46,11 @@ e as versões seguem o [Versionamento Semântico](https://semver.org/lang/pt-BR/
   absoluto, `..` e barras, junção para o System32, valores de tipo errado, nomes de serviço com `&`, 60
   rodadas de registro aleatório) e desempenho (300 jogos, 1000 entradas no registro de jogos, 2000 apps em
   segundo plano, árvore funda de executáveis).
-- `tests/run-smoke.ps1`: capturas da página Jogos, com um jogo de teste e uma recomendação selecionada.
+- `tests/run-smoke.ps1`: capturas da página Jogos, com um jogo de teste e uma recomendação selecionada, e
+  *Aplicar marcados* de ponta a ponta contra uma sandbox do registro (com e sem administrador, backup e
+  cancelamento).
+- `tests/run-admin-tests.ps1`: troca real do tipo de inicialização de um serviço de teste temporário pelo
+  Gerenciador de Serviços (rodar como administrador).
 
 ## [1.0.1] - 2026-10-17
 
