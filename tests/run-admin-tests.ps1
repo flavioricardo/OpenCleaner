@@ -1,4 +1,4 @@
-# Testes que exigem administrador: troca real do tipo de inicialização de serviço (página Jogos).
+﻿# Testes que exigem administrador: troca real do tipo de inicialização de serviço (página Jogos).
 # Cria o serviço de teste OpenCleanerTestSvc (desativado, apontando para um executável que não existe,
 # nunca iniciado), roda os testes e remove o serviço no final, mesmo se algo falhar.
 # Uso, num PowerShell aberto como administrador:
