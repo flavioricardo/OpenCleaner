@@ -201,7 +201,7 @@ namespace OpenCleaner.UI
                         var it = new ListViewItem(f.Name, group) { Tag = f, Checked = f.Kind == GameKind.Fix && f.DefaultChecked };
                         it.SubItems.Add(f.Current + " → " + f.Expected);
                         Theme.MonoCell(it, f.Location);
-                        if (f.Kind == GameKind.Tradeoff) it.ForeColor = Theme.Ambar;
+                        if (f.Kind == GameKind.Tradeoff || f.Security) it.ForeColor = Theme.Ambar; // segurança vem primeiro (ordem do scanner)
                         list.Items.Add(it);
                     }
                 };

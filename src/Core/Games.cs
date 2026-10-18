@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Management;
+using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using Microsoft.Win32;
 
 namespace OpenCleaner.Core
@@ -29,8 +32,12 @@ namespace OpenCleaner.Core
         /// <summary>Página do Windows onde o usuário muda a opção (Recommended e Tradeoff).</summary>
         public string SettingsUri;
         public string Id, Name, Why, Location, Current, Expected;
+        /// <summary>Deixa o PC menos seguro: aparece primeiro e em destaque.</summary>
+        public bool Security;
         public bool NeedsAdmin, DefaultChecked = true;
         public readonly List<RegEdit> Edits = new List<RegEdit>();
+        /// <summary>Chaves que o Run altera por fora do registro (serviços) e que entram no backup.</summary>
+        public readonly List<KeyValuePair<RegistryKey, string>> AlsoBackup = new List<KeyValuePair<RegistryKey, string>>();
         /// <summary>Ação fora do registro: trocar o plano de energia ou abrir uma página da Microsoft Store.</summary>
         public Func<bool> Run;
         /// <summary>O que dizer depois de aplicar, quando falta um passo do usuário (instalar pela Store).</summary>
@@ -49,6 +56,8 @@ namespace OpenCleaner.Core
         public int WindowsBuild;
         /// <summary>Integridade de Memória (HVCI) em execução agora.</summary>
         public Func<bool> MemoryIntegrityRunning;
+        /// <summary>Muda o tipo de inicialização de um serviço: nome, Start (2 automático, 3 manual) e se é atrasado.</summary>
+        public Func<string, int, bool, bool> SetServiceStart;
 
         public static GameContext System()
         {
@@ -69,8 +78,51 @@ namespace OpenCleaner.Core
                     try { Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true }); return true; }
                     catch { return false; }
                 },
-                MemoryIntegrityRunning = HvciRunning
+                MemoryIntegrityRunning = HvciRunning,
+                SetServiceStart = ScmSetStart
             };
+        }
+
+        [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern IntPtr OpenSCManager(string machine, string database, uint access);
+
+        [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern IntPtr OpenService(IntPtr scm, string name, uint access);
+
+        [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern bool ChangeServiceConfig(IntPtr service, uint type, uint start, uint error, string path, string group,
+                                               IntPtr tag, string dependencies, string user, string password, string display);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        static extern bool ChangeServiceConfig2(IntPtr service, uint level, ref int delayedAutoStart);
+
+        [DllImport("advapi32.dll")]
+        static extern bool CloseServiceHandle(IntPtr handle);
+
+        /// <summary>
+        /// Muda o tipo de inicialização pelo Gerenciador de Serviços (escrever direto no registro só vale depois
+        /// de reiniciar). Exige administrador. O nome vem do catálogo ou de uma subchave de Services já validada.
+        /// </summary>
+        static bool ScmSetStart(string name, int start, bool delayed)
+        {
+            if (!Regex.IsMatch(name ?? "", @"^[A-Za-z0-9_.\-]+$") || (start != 2 && start != 3)) return false;
+            const uint NoChange = 0xFFFFFFFF;
+            IntPtr scm = OpenSCManager(null, null, 0x0001); // SC_MANAGER_CONNECT
+            if (scm == IntPtr.Zero) return false;
+            try
+            {
+                IntPtr svc = OpenService(scm, name, 0x0002); // SERVICE_CHANGE_CONFIG
+                if (svc == IntPtr.Zero) return false;
+                try
+                {
+                    if (!ChangeServiceConfig(svc, NoChange, (uint)start, NoChange, null, null, IntPtr.Zero, null, null, null, null)) return false;
+                    if (start != 2) return true;
+                    int flag = delayed ? 1 : 0;
+                    return ChangeServiceConfig2(svc, 3, ref flag); // SERVICE_CONFIG_DELAYED_AUTO_START_INFO
+                }
+                finally { CloseServiceHandle(svc); }
+            }
+            finally { CloseServiceHandle(scm); }
         }
 
         /// <summary>Win32_DeviceGuard: SecurityServicesRunning contém 2 quando a Integridade de Memória está ativa.</summary>
@@ -78,8 +130,8 @@ namespace OpenCleaner.Core
         {
             try
             {
-                using (var s = new System.Management.ManagementObjectSearcher(@"root\Microsoft\Windows\DeviceGuard", "SELECT SecurityServicesRunning FROM Win32_DeviceGuard"))
-                    foreach (System.Management.ManagementObject o in s.Get())
+                using (var s = new ManagementObjectSearcher(@"root\Microsoft\Windows\DeviceGuard", "SELECT SecurityServicesRunning FROM Win32_DeviceGuard"))
+                    foreach (ManagementObject o in s.Get())
                         using (o)
                         {
                             var running = o["SecurityServicesRunning"] as uint[];
@@ -176,7 +228,8 @@ namespace OpenCleaner.Core
         {
             var found = new List<GameFinding>();
             foreach (var check in new Action<GameContext, List<GameFinding>>[]
-                { GameMode, GameDvrPolicyCheck, XboxSignIn, Background, PowerPlan,
+                { BrowserUpdates, WindowsUpdate, DefenderPolicy, UacOff, CpuMitigations,
+                  GameMode, GameDvrPolicyCheck, XboxSignIn, Background, PowerPlan,
                   BackgroundRecording, HardwareScheduling, WindowedOptimizations, MousePrecision, MemoryIntegrity })
             {
                 try { check(c, found); }
@@ -394,6 +447,205 @@ namespace OpenCleaner.Core
             found.Add(f);
         }
 
+        // ---- Segurança: o que boosters desligam "para ganhar FPS" ----
+
+        const string Services = @"SYSTEM\CurrentControlSet\Services";
+
+        /// <summary>Serviço desativado (Start=4) que deve voltar ao padrão: Start 2 (automático) ou 3 (manual).</summary>
+        class ServiceDefault
+        {
+            public string Name;
+            public int Start;
+            public bool Delayed;
+        }
+
+        /// <summary>Serviços que existem e estão desativados, com o padrão de cada um. Curingas só valem com o executável na pasta esperada.</summary>
+        static List<ServiceDefault> DisabledServices(GameContext c, IEnumerable<ServiceDefault> catalog, string wildcardPrefix = null, string wildcardFolder = null, int wildcardStart = 2)
+        {
+            var result = new List<ServiceDefault>();
+            using (var k = c.Hklm.OpenSubKey(Services))
+            {
+                if (k == null) return result;
+                var all = k.GetSubKeyNames();
+                var wanted = catalog.ToList();
+                if (wildcardPrefix != null)
+                    foreach (var n in all.Where(n => n.StartsWith(wildcardPrefix, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        // GoogleUpdaterService157.0.8089.0: aceita só se o executável estiver em Program Files\Google.
+                        string image;
+                        using (var s = k.OpenSubKey(n)) image = s == null ? null : Util.ExtractExePath(Util.ReadString(s, "ImagePath"));
+                        if (image != null && UnderProgramFiles(image, wildcardFolder))
+                            wanted.Add(new ServiceDefault { Name = n, Start = wildcardStart });
+                    }
+                foreach (var svc in wanted)
+                    if (all.Contains(svc.Name, StringComparer.OrdinalIgnoreCase) && ReadDword(c.Hklm, Services + "\\" + svc.Name, "Start") == 4)
+                        result.Add(svc);
+            }
+            return result;
+        }
+
+        static bool UnderProgramFiles(string exe, string folder)
+        {
+            foreach (var pf in new[] { Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                                       Environment.GetEnvironmentVariable("ProgramW6432") })
+                if (!string.IsNullOrEmpty(pf) && exe.StartsWith(Path.Combine(pf, folder) + "\\", StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        static void AddServiceFix(GameContext c, GameFinding f, List<ServiceDefault> services)
+        {
+            foreach (var s in services) f.AlsoBackup.Add(new KeyValuePair<RegistryKey, string>(c.Hklm, Services + "\\" + s.Name));
+            var run = f.Run;
+            f.Run = () =>
+            {
+                bool ok = run == null || run();
+                foreach (var s in services) ok &= c.SetServiceStart != null && c.SetServiceStart(s.Name, s.Start, s.Delayed);
+                return ok;
+            };
+        }
+
+        static void BrowserUpdates(GameContext c, List<GameFinding> found)
+        {
+            var chrome = DisabledServices(c, new[]
+            {
+                new ServiceDefault { Name = "gupdate", Start = 2, Delayed = true },
+                new ServiceDefault { Name = "gupdatem", Start = 3 },
+                new ServiceDefault { Name = "GoogleChromeElevationService", Start = 3 }
+            }, "GoogleUpdater", "Google");
+            var edge = DisabledServices(c, new[]
+            {
+                new ServiceDefault { Name = "edgeupdate", Start = 2, Delayed = true },
+                new ServiceDefault { Name = "edgeupdatem", Start = 3 },
+                new ServiceDefault { Name = "MicrosoftEdgeElevationService", Start = 3 }
+            });
+            foreach (var pair in new[] { new { Name = "Google Chrome", List = chrome }, new { Name = "Microsoft Edge", List = edge } })
+            {
+                if (pair.List.Count == 0) continue;
+                var f = new GameFinding
+                {
+                    Id = pair.Name == "Google Chrome" ? "chrome-updates" : "edge-updates",
+                    Security = true,
+                    NeedsAdmin = true,
+                    Name = L.F("Atualização automática do {0} desativada", "{0} automatic updates disabled", pair.Name),
+                    Why = L.F("O navegador é a porta de entrada da maior parte dos ataques, e as correções de segurança chegam pela atualização automática. Com esses serviços desativados, o {0} para de se atualizar sem avisar. Boosters desativam esses serviços para \"liberar memória\", com ganho nulo em jogos.",
+                              "The browser is the entry point for most attacks, and security fixes arrive through automatic updates. With these services disabled, {0} silently stops updating. Boosters disable them to \"free memory\", with no gain in games.", pair.Name),
+                    Location = string.Join(", ", pair.List.Select(s => s.Name)),
+                    Current = L.T("desativada", "disabled"),
+                    Expected = L.T("automática", "automatic")
+                };
+                AddServiceFix(c, f, pair.List);
+                found.Add(f);
+            }
+        }
+
+        static void WindowsUpdate(GameContext c, List<GameFinding> found)
+        {
+            const string wu = @"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate";
+            var services = DisabledServices(c, new[]
+            {
+                new ServiceDefault { Name = "wuauserv", Start = 3 },
+                new ServiceDefault { Name = "UsoSvc", Start = 2, Delayed = true }
+            });
+            var edits = new List<RegEdit>();
+            bool wsus;
+            using (var k = c.Hklm.OpenSubKey(wu)) wsus = k != null && Util.ReadString(k, "WUServer") != null;
+            if (!wsus) // com WSUS, a empresa gerencia as atualizações por política: não é coisa de booster
+            {
+                if (ReadDword(c.Hklm, wu + @"\AU", "NoAutoUpdate") == 1) edits.Add(new RegEdit { Root = c.Hklm, Key = wu + @"\AU", Name = "NoAutoUpdate" });
+                if (ReadDword(c.Hklm, wu, "DisableWindowsUpdateAccess") == 1) edits.Add(new RegEdit { Root = c.Hklm, Key = wu, Name = "DisableWindowsUpdateAccess" });
+            }
+            if (services.Count == 0 && edits.Count == 0) return;
+            var f = new GameFinding
+            {
+                Id = "windows-update",
+                Security = true,
+                NeedsAdmin = true,
+                Name = L.T("Windows Update desligado", "Windows Update turned off"),
+                Why = L.T("Sem o Windows Update, o Windows não recebe correções de segurança nem drivers novos de placa de vídeo. O Modo de Jogo já impede que atualizações sejam instaladas durante a partida; desligar o Windows Update inteiro só deixa o PC exposto.",
+                          "Without Windows Update, Windows gets no security fixes and no new graphics drivers. Game Mode already keeps updates from installing while you play; turning off Windows Update entirely just leaves the PC exposed."),
+                Location = string.Join(", ", services.Select(s => s.Name).Concat(edits.Select(e => e.Name))),
+                Current = L.T("desligado", "off"),
+                Expected = L.T("ligado", "on")
+            };
+            f.Edits.AddRange(edits);
+            if (services.Count > 0) AddServiceFix(c, f, services);
+            found.Add(f);
+        }
+
+        static void DefenderPolicy(GameContext c, List<GameFinding> found)
+        {
+            const string def = @"SOFTWARE\Policies\Microsoft\Windows Defender";
+            const string rtp = def + @"\Real-Time Protection";
+            var edits = new List<RegEdit>();
+            if (ReadDword(c.Hklm, def, "DisableAntiSpyware") == 1) edits.Add(new RegEdit { Root = c.Hklm, Key = def, Name = "DisableAntiSpyware" });
+            foreach (var n in new[] { "DisableRealtimeMonitoring", "DisableBehaviorMonitoring" })
+                if (ReadDword(c.Hklm, rtp, n) == 1) edits.Add(new RegEdit { Root = c.Hklm, Key = rtp, Name = n });
+            if (edits.Count == 0) return;
+            int? tamper = ReadDword(c.Hklm, @"SOFTWARE\Microsoft\Windows Defender\Features", "TamperProtection");
+            bool tamperOn = tamper.HasValue && (tamper.Value & 1) == 1; // 5 (ou 1) = ligada; 4 (ou 0) = desligada
+            var f = new GameFinding
+            {
+                Id = "defender-policy",
+                Security = true,
+                NeedsAdmin = true,
+                Name = L.T("Políticas que desligam o Microsoft Defender", "Policies that turn off Microsoft Defender"),
+                Why = L.T("Essas políticas de empresa desligam a proteção em tempo real do Defender. O custo do Defender em jogos é pequeno, e jogos piratas e \"otimizadores\" são justamente uma porta comum de vírus.",
+                          "These company policies turn off Defender real-time protection. Defender costs little in games, and cracked games and \"optimizers\" are a common way in for malware.") +
+                      (tamperOn ? L.T(" A Proteção contra Adulteração está ligada: o Defender já ignora essas políticas e pode recusar a remoção. Por isso o item vem desmarcado.",
+                                      " Tamper Protection is on: Defender already ignores these policies and may refuse to remove them. That is why this item starts unchecked.") : ""),
+                Location = Where(c.Hklm, def, string.Join(", ", edits.Select(e => e.Name))),
+                Current = tamperOn ? L.T("desligado por política (ignorada)", "off by policy (ignored)") : L.T("desligado por política", "off by policy"),
+                Expected = L.T("sem política", "no policy"),
+                DefaultChecked = !tamperOn
+            };
+            f.Edits.AddRange(edits);
+            found.Add(f);
+        }
+
+        static void UacOff(GameContext c, List<GameFinding> found)
+        {
+            const string sys = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System";
+            if (ReadDword(c.Hklm, sys, "EnableLUA") != 0) return;
+            var f = new GameFinding
+            {
+                Id = "uac-off",
+                Security = true,
+                NeedsAdmin = true,
+                Name = L.T("Controle de Conta de Usuário (UAC) desligado", "User Account Control (UAC) turned off"),
+                Why = L.T("Sem o UAC, qualquer programa roda com poder total sobre o Windows, sem pedir licença, e apps da Microsoft Store (inclusive jogos do Game Pass) podem nem abrir. O UAC não afeta o desempenho dos jogos.",
+                          "Without UAC, any program runs with full control over Windows without asking, and Microsoft Store apps (including Game Pass games) may not open at all. UAC does not affect game performance."),
+                Location = Where(c.Hklm, sys, "EnableLUA"),
+                Current = L.T("desligado", "off"),
+                Expected = L.T("ligado", "on"),
+                AfterApply = L.T("Reinicie o PC para o UAC voltar a funcionar.", "Restart the PC for UAC to work again.")
+            };
+            f.Edits.Add(new RegEdit { Root = c.Hklm, Key = sys, Name = "EnableLUA", Value = 1 });
+            found.Add(f);
+        }
+
+        static void CpuMitigations(GameContext c, List<GameFinding> found)
+        {
+            const string mm = @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management";
+            // 3 desliga as proteções contra Spectre (variante 2) e Meltdown. Outros valores (8, 72...) LIGAM proteções extras.
+            if (ReadDword(c.Hklm, mm, "FeatureSettingsOverride") != 3) return;
+            var f = new GameFinding
+            {
+                Id = "cpu-mitigations",
+                Security = true,
+                NeedsAdmin = true,
+                Name = L.T("Proteções contra Spectre e Meltdown desligadas", "Spectre and Meltdown protections turned off"),
+                Why = L.T("Essas proteções impedem que um programa leia a memória de outro por falhas do processador. Boosters as desligam prometendo FPS; em processadores dos últimos anos o ganho em jogos é desprezível, e o risco continua.",
+                          "These protections stop one program from reading another's memory through processor flaws. Boosters turn them off promising FPS; on recent processors the gain in games is negligible, and the risk remains."),
+                Location = Where(c.Hklm, mm, "FeatureSettingsOverride"),
+                Current = L.T("desligadas", "off"),
+                Expected = L.T("padrão do Windows", "Windows default"),
+                AfterApply = L.T("Reinicie o PC para as proteções do processador voltarem.", "Restart the PC for the processor protections to come back.")
+            };
+            f.Edits.Add(new RegEdit { Root = c.Hklm, Key = mm, Name = "FeatureSettingsOverride" });
+            f.Edits.Add(new RegEdit { Root = c.Hklm, Key = mm, Name = "FeatureSettingsOverrideMask" });
+            found.Add(f);
+        }
+
         // ---- Recomendado para jogos e Desempenho × segurança: só leem e abrem a página do Windows ----
 
         static GameFinding Advice(GameKind kind, string id, string page)
@@ -479,8 +731,9 @@ namespace OpenCleaner.Core
         /// <summary>Chaves que os consertos vão alterar, no formato do Util.ExportRegistry.</summary>
         public static IEnumerable<KeyValuePair<string, RegistryView>> BackupKeys(IEnumerable<GameFinding> findings)
         {
-            return findings.SelectMany(f => f.Edits)
-                           .Select(e => new KeyValuePair<string, RegistryView>(e.Root.Name + "\\" + e.Key, e.Root.View));
+            var list = findings.ToList();
+            return list.SelectMany(f => f.Edits.Select(e => new KeyValuePair<RegistryKey, string>(e.Root, e.Key)).Concat(f.AlsoBackup))
+                       .Select(k => new KeyValuePair<string, RegistryView>(k.Key.Name + "\\" + k.Value, k.Key.View));
         }
 
         /// <summary>Exporta para um .reg as chaves que os consertos vão alterar.</summary>

@@ -1,6 +1,6 @@
 # Plano: menu Jogos
 
-Status: etapas 1 a 5 implementadas. O núcleo está em `src/Core/Games.cs`, `GameLibrary.cs` e
+Status: etapas 1 a 6 implementadas. O núcleo está em `src/Core/Games.cs`, `GameLibrary.cs` e
 `GpuPreference.cs`; a interface, em `src/UI/GamesPage.cs`, no item "Jogos" da barra lateral e num 4º
 cartão na Verificação de saúde. Testes: `tests/RealTests.cs` e capturas em `tests/SmokeTest.cs`. Os quatro
 cartões ficam sempre numa linha: duas linhas não cabem na altura mínima da janela.
@@ -79,13 +79,13 @@ que já existe.
 | `xbox-sign-in` | Faltam `Microsoft.XboxIdentityProvider` ou `Microsoft.Xbox.TCUI`, que vêm com o Windows; ou falta `Microsoft.GamingServices` com o app Xbox (`Microsoft.GamingApp`) instalado (lido em `HKCU\Software\Classes\Local Settings\...\AppModel\Repository\Packages`, sem PowerShell) | **Não reinstala sozinho**: abre na Microsoft Store a página do primeiro que falta: Identity Provider `9WZDNCRD1HKW`, TCUI `9NKNC0LD5NN6`, Gaming Services `9MWPM2CQNLHN` (confirmados em 17/10/2026). Só aponta se a Microsoft Store estiver instalada (no LTSC esses apps nunca vêm). Não mexe no registro, então não entra no backup | sim, os dois primeiros |
 | `power-plan-copy` | Plano ativo fora dos GUIDs do Windows e com a descrição do *Desempenho Máximo* (`@%SystemRoot%\system32\powrprof.dll,-18`, visto no `.pow` do Nich FPS+), **em PC com bateria** | `powercfg /setactive` no Equilibrado. O plano copiado continua na lista | sim |
 | `background-apps` | `GlobalUserDisabled=1` (HKCU) ou a política `LetAppsRunInBackground=2` | Apaga os valores. Se **todos** os apps tiverem `Disabled=1`, o padrão típico de booster, oferece limpar esses valores também | sim |
-| `browser-updates` | Serviços de atualização do Chrome (`gupdate`, `gupdatem`, `GoogleUpdaterService*`, `GoogleUpdaterInternalService*`, `GoogleChromeElevationService`) ou do Edge desativados | Padrão de cada serviço (`gupdate`/`edgeupdate`: Automático atrasado; os demais: Manual) | a conferir |
-| `windows-update` | `wuauserv`/`UsoSvc` desativados; políticas `NoAutoUpdate=1`, `DisableWindowsUpdateAccess=1` | `wuauserv` Manual, `UsoSvc` Automático atrasado; apaga as políticas | não |
-| `defender-policy` | Políticas `DisableAntiSpyware`, `DisableRealtimeMonitoring`, `DisableBehaviorMonitoring` = 1 | Apaga os valores. Com a Proteção contra Adulteração ligada, o Defender já ignora essas políticas, e o item diz isso | não |
+| `chrome-updates`, `edge-updates` | Serviços de atualização do Chrome (`gupdate`, `gupdatem`, `GoogleChromeElevationService` e os `GoogleUpdater*` com executável em `Program Files\Google`) ou do Edge (`edgeupdate`, `edgeupdatem`, `MicrosoftEdgeElevationService`) com `Start=4` | Pelo Gerenciador de Serviços (`ChangeServiceConfig`/`ChangeServiceConfig2`): `gupdate`/`edgeupdate` Automático atrasado, `GoogleUpdater*` Automático, os demais Manual (padrões conferidos neste PC) | não (o Chrome se reparou) |
+| `windows-update` | `wuauserv`/`UsoSvc` desativados; políticas `NoAutoUpdate=1`, `DisableWindowsUpdateAccess=1` | `wuauserv` Manual, `UsoSvc` Automático atrasado; apaga as políticas. Com `WUServer` (WSUS) configurado, as políticas são da empresa e não são apontadas | não |
+| `defender-policy` | Políticas `DisableAntiSpyware`, `DisableRealtimeMonitoring`, `DisableBehaviorMonitoring` = 1 | Apaga os valores. Com a Proteção contra Adulteração ligada, o Defender já ignora essas políticas e pode recusar a remoção: o item diz isso e vem desmarcado (`TamperProtection` 5 ou 1) | não |
 | `uac-off` | `EnableLUA=0` | `EnableLUA=1` (exige reiniciar) | não |
-| `cpu-mitigations` | `FeatureSettingsOverride` e `FeatureSettingsOverrideMask` = 3 | Apaga os dois valores (exige reiniciar) | não |
+| `cpu-mitigations` | `FeatureSettingsOverride=3` (outros valores, como 8 ou 72, ligam proteções extras e não são apontados) | Apaga os dois valores (exige reiniciar) | não |
 
-Os itens de segurança (`browser-updates` em diante) aparecem primeiro e em âmbar: boosters para jogos
+Os itens de segurança (da tabela acima, de `chrome-updates` a `cpu-mitigations`) aparecem primeiro e em âmbar: boosters para jogos
 costumam desligar isso tudo em nome de FPS.
 
 ### GPU dos jogos (notebooks com duas placas de vídeo)

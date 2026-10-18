@@ -779,6 +779,104 @@ static class RealTests
                   "Windows 10, agendamento de GPU ligado, precisão do ponteiro desligada e HVCI desligada: só sobra a gravação");
         }
 
+        // Segurança: serviços e políticas numa sandbox; a troca do tipo de inicialização é simulada no registro.
+        using (var hklm = Registry.CurrentUser.CreateSubKey(TestKey + @"\Security\HKLM"))
+        using (var hkcu = Registry.CurrentUser.CreateSubKey(TestKey + @"\Security\HKCU"))
+        {
+            const string svc = @"SYSTEM\CurrentControlSet\Services\";
+            Action<string, int, bool, string> service = (name, start, delayed, image) =>
+            {
+                using (var k = hklm.CreateSubKey(svc + name))
+                {
+                    k.SetValue("Start", start, RegistryValueKind.DWord);
+                    if (delayed) k.SetValue("DelayedAutostart", 1, RegistryValueKind.DWord);
+                    if (image != null) k.SetValue("ImagePath", image, RegistryValueKind.ExpandString);
+                }
+            };
+            var calls = new List<string>();
+            var ctx = new GameContext
+            {
+                Hklm = hklm, Hkcu = hkcu,
+                SetServiceStart = (name, start, delayed) =>
+                {
+                    calls.Add(name);
+                    using (var k = hklm.CreateSubKey(svc + name))
+                    {
+                        k.SetValue("Start", start, RegistryValueKind.DWord);
+                        k.SetValue("DelayedAutostart", delayed ? 1 : 0, RegistryValueKind.DWord);
+                    }
+                    return true;
+                }
+            };
+            Func<List<GameFinding>> security = () => GameScanner.Scan(ctx).Where(f => f.Security).ToList();
+            string googleDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"Google\GoogleUpdater\157.0.8089.0\updater.exe");
+
+            // Padrão do Windows: nada é apontado.
+            service("gupdate", 2, true, null); service("gupdatem", 3, false, null); service("edgeupdate", 2, true, null);
+            service("wuauserv", 3, false, null); service("UsoSvc", 2, true, null);
+            service("GoogleUpdaterService157.0.8089.0", 2, false, "\"" + googleDir + "\" --system --windows-service");
+            Dword(hklm, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System", "EnableLUA", 1);
+            Dword(hklm, @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "FeatureSettingsOverride", 8); // 8 LIGA proteção extra
+            Check(security().Count == 0, "segurança: serviços no padrão, UAC ligado e FeatureSettingsOverride=8 não são apontados");
+
+            // O que boosters fazem.
+            foreach (var n in new[] { "gupdate", "gupdatem", "edgeupdate", "wuauserv", "UsoSvc", "GoogleUpdaterService157.0.8089.0" }) Dword(hklm, svc + n, "Start", 4);
+            service("GoogleUpdaterEvil", 4, false, "\"C:\\Temp\\evil.exe\"");
+            Dword(hklm, @"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU", "NoAutoUpdate", 1);
+            Dword(hklm, @"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate", "DisableWindowsUpdateAccess", 1);
+            Dword(hklm, @"SOFTWARE\Policies\Microsoft\Windows Defender", "DisableAntiSpyware", 1);
+            Dword(hklm, @"SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection", "DisableRealtimeMonitoring", 1);
+            Dword(hklm, @"SOFTWARE\Microsoft\Windows Defender\Features", "TamperProtection", 5);
+            Dword(hklm, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System", "EnableLUA", 0);
+            Dword(hklm, @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "FeatureSettingsOverride", 3);
+            Dword(hklm, @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "FeatureSettingsOverrideMask", 3);
+
+            var scanned = GameScanner.Scan(ctx);
+            var sec = scanned.Where(f => f.Security).ToList();
+            var ids = sec.Select(f => f.Id).ToList();
+            string[] expected = { "chrome-updates", "edge-updates", "windows-update", "defender-policy", "uac-off", "cpu-mitigations" };
+            Check(ids.SequenceEqual(expected), "os 6 itens de segurança, nesta ordem (achou " + string.Join(", ", ids) + ")");
+            Check(scanned.Take(expected.Length).All(f => f.Security) && sec.All(f => f.NeedsAdmin && f.Kind == GameKind.Fix), "segurança vem primeiro e pede administrador");
+            var chrome = sec.FirstOrDefault(f => f.Id == "chrome-updates");
+            Check(chrome != null && chrome.Location.Contains("GoogleUpdaterService157.0.8089.0") && !chrome.Location.Contains("GoogleUpdaterEvil"),
+                  "curinga GoogleUpdater* só aceita serviço com executável em Program Files\\Google");
+            var defender = sec.FirstOrDefault(f => f.Id == "defender-policy");
+            Check(defender != null && !defender.DefaultChecked, "Defender com Proteção contra Adulteração ligada: item vem desmarcado");
+            Check(sec.Where(f => f.Id == "uac-off" || f.Id == "cpu-mitigations").All(f => f.AfterApply != null), "UAC e mitigações avisam para reiniciar");
+
+            string backup = Path.Combine(sandbox, "seguranca.reg");
+            string error;
+            string text = GameScanner.Backup(sec, backup, out error) ? File.ReadAllText(backup, Encoding.Unicode) : "";
+            Check(text.Contains(@"Services\gupdate]") && text.Contains(@"Services\UsoSvc]") && text.Contains("EnableLUA") && text.Contains("NoAutoUpdate"),
+                  "backup .reg inclui as chaves dos serviços e as políticas" + (error != null ? " (" + error + ")" : ""));
+
+            int ok = sec.Count(GameScanner.Fix);
+            Func<string, string, object> v = (key, name) => Value(hklm, key, name);
+            Check(ok == sec.Count && security().Count == 0, "os 6 itens consertados; a nova verificação não acha nada (serviços: " + string.Join(", ", calls) + ")");
+            Check(Equals(v(svc + "gupdate", "Start"), 2) && Equals(v(svc + "gupdate", "DelayedAutostart"), 1) && Equals(v(svc + "gupdatem", "Start"), 3) &&
+                  Equals(v(svc + "GoogleUpdaterService157.0.8089.0", "Start"), 2) && Equals(v(svc + "edgeupdate", "Start"), 2) &&
+                  Equals(v(svc + "wuauserv", "Start"), 3) && Equals(v(svc + "UsoSvc", "Start"), 2) && Equals(v(svc + "UsoSvc", "DelayedAutostart"), 1),
+                  "cada serviço volta ao seu padrão (automático atrasado, automático ou manual)");
+            Check(!calls.Contains("GoogleUpdaterEvil") && Equals(v(svc + "GoogleUpdaterEvil", "Start"), 4), "serviço fora de Program Files\\Google não é tocado");
+            Check(v(@"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU", "NoAutoUpdate") == null && v(@"SOFTWARE\Policies\Microsoft\Windows Defender", "DisableAntiSpyware") == null &&
+                  Equals(v(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System", "EnableLUA"), 1) &&
+                  v(@"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "FeatureSettingsOverride") == null &&
+                  v(@"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "FeatureSettingsOverrideMask") == null,
+                  "políticas apagadas, UAC religado e mitigações de volta ao padrão");
+
+            // Empresa com WSUS: a política de atualização é dela.
+            Dword(hklm, @"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU", "NoAutoUpdate", 1);
+            using (var k = hklm.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate")) k.SetValue("WUServer", "http://wsus.empresa.local");
+            Check(!security().Any(f => f.Id == "windows-update"), "com WSUS configurado, a política de atualização não é apontada");
+
+            Dword(hklm, svc + "gupdate", "Start", 4);
+            ctx.SetServiceStart = null;
+            var orphan = security().FirstOrDefault(f => f.Id == "chrome-updates");
+            Check(orphan != null && !GameScanner.Fix(orphan), "sem como mudar serviços, o conserto falha em vez de fingir sucesso");
+            var scm = GameContext.System().SetServiceStart;
+            Check(!scm("nome com espaço; x", 2, false) && !scm("wuauserv", 4, false), "o Gerenciador de Serviços só recebe nomes válidos e Start 2 ou 3");
+        }
+
         var real = Stopwatch.StartNew();
         var onThisPc = GameScanner.Scan(GameContext.System());
         Perf("Verificar ajustes de jogos (registro real, só leitura)", real, onThisPc.Count + " itens: " + string.Join(", ", onThisPc.Select(f => f.Id)));
