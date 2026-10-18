@@ -13,6 +13,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
   a scanned file has a path longer than 260 characters.
 - Registry and Gaming backups (`registry-…reg`, `games-…reg`) and the installed programs export
   (`installed-programs.txt`) are now suggested with English names when the interface is in English.
+- Uninstall programs: the list refreshes by itself when the uninstall finishes. Uninstallers that relaunch
+  themselves from `%TEMP%` (NSIS, Inno Setup) closed the original process right away, so the list was
+  reloaded before anything was removed.
 
 ## [1.2.0] - 2026-10-18
 

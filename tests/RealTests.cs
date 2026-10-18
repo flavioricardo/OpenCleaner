@@ -1354,7 +1354,10 @@ static class RealTests
         var proc = Programs.Uninstall(app);
         proc.WaitForExit(15000);
         Check(File.Exists(marker) && File.ReadAllText(marker) == "/uninstall /quiet", "desinstalador executado com os argumentos certos (caminho com espaços)");
+        // O desinstalador de teste não apaga a entrada (como um NSIS que se reabriu em %TEMP%): a espera continua.
+        Check(!Programs.WaitForRemoval(proc, app, TimeSpan.FromSeconds(2)), "espera a entrada sair do registro, não só o processo fechar");
         Check(Programs.DeleteEntry(app) && Registry.CurrentUser.OpenSubKey(key) == null, "Remover da lista apaga a entrada");
+        Check(!Programs.Exists(app) && Programs.WaitForRemoval(null, app, TimeSpan.FromSeconds(2)), "entrada removida encerra a espera");
     }
 
     // =====================================================================

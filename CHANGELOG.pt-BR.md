@@ -14,6 +14,9 @@ arquivo é a [em inglês](CHANGELOG.md); esta é a tradução.
   `PathTooLongException` quando um arquivo analisado tem caminho com mais de 260 caracteres.
 - Os backups do Registro e de Jogos (`registry-…reg`, `games-…reg`) e a lista de programas instalados
   (`installed-programs.txt`) agora são sugeridos com nome em inglês quando a interface está em inglês.
+- Desinstalar programas: a lista se atualiza sozinha quando a desinstalação termina. Desinstaladores que se
+  reabrem a partir do `%TEMP%` (NSIS, Inno Setup) fechavam o processo original na hora, e a lista era
+  recarregada antes de qualquer coisa ser removida.
 
 ## [1.2.0] - 2026-10-18
 

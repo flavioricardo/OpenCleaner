@@ -150,8 +150,10 @@ namespace OpenCleaner.UI
             try
             {
                 var proc = Programs.Uninstall(p);
-                SetStatus(L.T("Desinstalador de ", "Uninstaller for ") + p.Name + L.T(" aberto. A lista é atualizada quando ele fechar.", " opened. The list refreshes when it closes."));
-                if (proc != null) RunBackground(() => proc.WaitForExit(), Reload);
+                SetStatus(L.T("Desinstalador de ", "Uninstaller for ") + p.Name + L.T(" aberto. A lista é atualizada quando a desinstalação terminar.", " opened. The list refreshes when the uninstall finishes."));
+                // Cancelado no desinstalador: a entrada fica e a lista não muda; o limite só libera a thread.
+                bool removed = false;
+                RunBackground(() => removed = Programs.WaitForRemoval(proc, p, TimeSpan.FromMinutes(30)), () => { if (removed) Reload(); });
             }
             catch (Exception ex)
             {

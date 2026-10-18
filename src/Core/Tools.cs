@@ -92,6 +92,33 @@ namespace OpenCleaner.Core
             return Process.Start(new ProcessStartInfo(file, args) { UseShellExecute = true });
         }
 
+        public static bool Exists(InstalledProgram p)
+        {
+            try
+            {
+                using (var b = RegistryKey.OpenBaseKey(p.Hive, p.View))
+                using (var k = b.OpenSubKey(p.KeyPath))
+                    return k != null;
+            }
+            catch { return true; }
+        }
+
+        /// <summary>
+        /// Espera o desinstalador terminar: true quando a entrada sai do registro. Muitos (NSIS, Inno Setup)
+        /// se copiam para %TEMP% e se reabrem, então o processo aberto fecha antes de desinstalar.
+        /// </summary>
+        public static bool WaitForRemoval(Process proc, InstalledProgram p, TimeSpan limit)
+        {
+            var sw = Stopwatch.StartNew();
+            if (proc != null) using (proc) proc.WaitForExit((int)limit.TotalMilliseconds);
+            while (Exists(p))
+            {
+                if (sw.Elapsed > limit) return false;
+                System.Threading.Thread.Sleep(1000);
+            }
+            return true;
+        }
+
         public static bool DeleteEntry(InstalledProgram p)
         {
             try
