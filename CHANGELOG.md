@@ -3,6 +3,39 @@
 Todas as mudanças relevantes do OpenCleaner. O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/)
 e as versões seguem o [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [1.1.0] - 2026-10-17
+
+### Adicionado
+
+- **Jogos** (novo item na barra lateral e cartão na Verificação de saúde): encontra e desfaz o que "game
+  boosters" deixam no Windows, com backup `.reg` antes de aplicar.
+  - Ajustes deixados por otimizadores: Modo de Jogo desligado, política que bloqueia a Xbox Game Bar, apps
+    em segundo plano proibidos, cópia do Desempenho Máximo ativa num notebook e apps do Xbox ausentes
+    (Xbox Identity Provider, Xbox TCUI, Gaming Services), que só abrem a página na Microsoft Store.
+  - Segurança: atualização automática do Chrome e do Edge desativada, Windows Update desligado, Defender
+    desligado por política, UAC desligado e proteções contra Spectre/Meltdown desligadas.
+  - Placa de vídeo dos jogos: em notebooks com duas placas, encontra os jogos (Steam, Epic Games e os que o
+    Windows já viu rodar) e os põe em *Alto desempenho*, a mesma opção das Configurações.
+  - Recomendado para jogos (só leitura, abre a página do Windows): gravação em segundo plano, agendamento de
+    GPU, otimizações para jogos em janela e precisão do ponteiro. Desempenho × segurança: Integridade de
+    Memória, só como informação.
+
+### Alterado
+
+- O cache de shaders (DirectX, NVIDIA, AMD) vem desmarcado na Limpeza personalizada, com aviso: apagá-lo faz
+  os jogos recompilarem os shaders e travarem nas primeiras partidas.
+- Verificação de saúde com quatro cartões e textos mais curtos.
+
+### Corrigido
+
+- Parágrafo duplicado e quebrado (`testsun-real.ps1`) nos READMEs.
+
+### Testes
+
+- `tests/run-real.ps1`: sandboxes de registro, serviços e bibliotecas de jogos para cada item da página
+  Jogos, inclusive falsos positivos, backup, conserto e restauração.
+- `tests/run-smoke.ps1`: capturas da página Jogos, com um jogo de teste e uma recomendação selecionada.
+
 ## [1.0.1] - 2026-10-17
 
 ### Segurança
@@ -47,5 +80,6 @@ Primeira versão pública.
 - App, instalador e desinstalador em português e inglês, com o idioma do Windows por padrão, seletor no instalador
   e em *Opções*; as seleções de limpeza salvas valem nos dois idiomas.
 
+[1.1.0]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.1.0
 [1.0.1]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.0.1
 [1.0.0]: https://github.com/flavioricardo/OpenCleaner/releases/tag/v1.0.0

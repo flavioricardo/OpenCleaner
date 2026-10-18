@@ -7,8 +7,8 @@
 # OpenCleaner
 
 **Limpador de PC gratuito e de código aberto para Windows.**
-Libera espaço em disco, limpa navegadores, corrige o registro, atualiza programas e drivers e
-gerencia a inicialização, sem telemetria, sem anúncios e sem versão paga.
+Libera espaço em disco, limpa navegadores, corrige o registro, atualiza programas e drivers, gerencia
+a inicialização e desfaz o que os "game boosters" quebram, sem telemetria, sem anúncios e sem versão paga.
 
 [![Última versão](https://img.shields.io/github/v/release/flavioricardo/OpenCleaner?label=vers%C3%A3o&color=0E7C66)](https://github.com/flavioricardo/OpenCleaner/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/flavioricardo/OpenCleaner/total?label=downloads&color=0E7C66)](https://github.com/flavioricardo/OpenCleaner/releases)
@@ -51,7 +51,7 @@ O OpenCleaner faz o trabalho de um limpador de sistema completo e para por aí:
 - **Em português e em inglês**: o app e o instalador seguem o idioma do Windows, e dá para trocar a qualquer momento.
 - **Sem telemetria**: o app não envia nada sobre você nem sobre o seu PC.
 - **Transparente**: o código está aqui, e cada item de limpeza mostra exatamente quais arquivos sairão.
-- **Leve**: um único executável de cerca de 230 KB, sem serviço em segundo plano e sem iniciar com o Windows.
+- **Leve**: um único executável de cerca de 340 KB, sem serviço em segundo plano e sem iniciar com o Windows.
 - **Cuidadoso**: analisar nunca apaga nada; o que é destrutivo pede confirmação; senhas e cookies vêm desmarcados.
 
 ## Baixar e instalar
@@ -87,8 +87,9 @@ você quer manter suas configurações e os backups do registro.
 ### Verificação de saúde
 
 Uma visão do PC numa tela: quanto do disco do sistema está usado, quanto **pode ser liberado**
-(o trecho hachurado do medidor), entradas órfãs no registro, programas que abrem com o Windows e
-programas com versão nova disponível. A verificação só lê; nada muda até você clicar em **Limpar**.
+(o trecho hachurado do medidor), entradas órfãs no registro, programas que abrem com o Windows,
+programas com versão nova disponível e ajustes de jogos para desfazer. A verificação só lê; nada muda até
+você clicar em **Limpar**.
 
 ### Limpeza personalizada
 
@@ -100,7 +101,7 @@ cliques num resultado, a lista de arquivos; depois clique em **Executar limpeza*
 
 | Grupo | O que limpa |
 |---|---|
-| Windows: Sistema | Lixeira, arquivos temporários (com a opção de manter os de menos de 24 h), despejos de memória, fragmentos do Chkdsk, logs do Windows e de rastreamento de eventos, Relatório de Erros do Windows, cache de DNS, Otimização de Entrega, downloads do Windows Update, Prefetch antigo, cache de shaders de GPU (DirectX, NVIDIA, AMD), logs de instalação de drivers, área de transferência |
+| Windows: Sistema | Lixeira, arquivos temporários (com a opção de manter os de menos de 24 h), despejos de memória, fragmentos do Chkdsk, logs do Windows e de rastreamento de eventos, Relatório de Erros do Windows, cache de DNS, Otimização de Entrega, downloads do Windows Update, Prefetch antigo, cache de shaders de GPU (DirectX, NVIDIA, AMD; desmarcado, porque os jogos o recompilam e travam), logs de instalação de drivers, área de transferência |
 | Windows: Explorador | Cache de miniaturas, documentos recentes, histórico do Executar, outras listas de itens recentes, listas de atalhos da barra de tarefas |
 | Navegadores | **Google Chrome, Microsoft Edge, Brave, Vivaldi, Opera e Opera GX**: cache, histórico de navegação e downloads, cookies, sessão, formulários salvos e senhas salvas. **Mozilla Firefox**: cache, cookies, sessão, formulários salvos e relatórios de falha |
 | Aplicativos | Discord, Microsoft Teams (clássico e novo), Zoom, Spotify, Visual Studio Code, Steam, OneDrive, Java, Telegram Desktop, arquivos de instalação da NVIDIA, histórico do 7-Zip, Paint, Regedit e Área de Trabalho Remota |
@@ -117,6 +118,28 @@ Encontra entradas que apontam para arquivos e programas que não existem mais, e
 DLLs compartilhadas ausentes, caminhos de programas, programas já removidos, inicialização sem
 arquivo, nomes de programas removidos, pastas de instaladores e fontes ausentes. Antes de corrigir,
 oferece um **backup `.reg`** para desfazer com dois cliques.
+
+### Jogos
+
+<img src="docs/screenshots/pt-BR/jogos.png" width="760" alt="PC para jogos: ajustes deixados por otimizadores e opções do Windows para jogos">
+
+"Game boosters" e "otimizadores de FPS" mudam dezenas de configurações do Windows de uma vez, sem mostrar
+quais, e muitas dessas mudanças continuam valendo anos depois que o programa sai do PC. Algumas pioram as
+coisas: desligam o Modo de Jogo, removem os apps do Xbox que os jogos do Game Pass usam para fazer login ou
+deixam um notebook num plano de energia de PC de mesa. A página **Jogos** encontra o que eles deixaram,
+explica cada item e volta ao padrão do Windows o que você marcar ao clicar em **Aplicar marcados**. A
+verificação roda quando você abre a página e só lê.
+
+| Grupo | O que mostra | O que aplicar faz |
+|---|---|---|
+| Segurança (deixado por otimizadores) | Serviços de atualização do Chrome ou do Edge desativados, Windows Update desligado, Microsoft Defender desligado por política, UAC desligado, proteções contra Spectre/Meltdown desligadas | Volta cada serviço ao padrão pelo Gerenciador de Serviços, apaga as políticas, religa o UAC. O UAC e as proteções do processador pedem reiniciar |
+| Deixado por otimizadores | Modo de Jogo desligado, política que bloqueia a Xbox Game Bar, Xbox Identity Provider/TCUI ou Gaming Services ausentes, todos os apps proibidos de rodar em segundo plano, cópia do *Desempenho Máximo* ativa num notebook | Religa o Modo de Jogo, apaga as políticas, ativa o plano Equilibrado. Para os apps do Xbox, só **abre a página na Microsoft Store**: você clica em *Obter* |
+| Placa de vídeo dos jogos (notebooks com duas placas de vídeo) | Cada jogo encontrado (Steam, Epic Games e os jogos que o Windows já viu rodar) que não está em *Alto desempenho* | Põe o jogo em *Alto desempenho*, a mesma opção de *Configurações > Sistema > Tela > Elementos gráficos* |
+| Recomendado para jogos | Gravação em segundo plano ligada, agendamento de GPU acelerado por hardware desligado, otimizações para jogos em janela desligadas (Windows 11), "Aumentar a precisão do ponteiro" ligado | Nada: o link abre a página certa do Windows e você decide |
+| Desempenho × segurança | Integridade de Memória ligada | Nada: a Microsoft diz que desligar pode ajudar alguns jogos, em troca de proteção. O OpenCleaner não recomenda nem muda |
+
+Não há botão de "turbo": ajustes sem ganho medível nos jogos atuais (Nagle, `NetworkThrottlingIndex`,
+resolução do timer, "limpadores de RAM") ficam de fora de propósito, e as escolhas de privacidade são suas.
 
 ### Atualizar programas
 
@@ -151,6 +174,9 @@ drivers certificados e publicados pelos fabricantes) e instala os que você marc
 | Analisar, Verificar agora, Procurar | Só lê. Nada é alterado. | — | Não |
 | Executar limpeza / Limpar | Apaga os arquivos dos itens marcados (direto, sem passar pela Lixeira), esvazia a Lixeira, limpa o cache de DNS e a área de transferência e remove listas de itens recentes do registro | Não | Só para pastas do sistema (`C:\Windows\Temp`, Prefetch, Windows Update, Otimização de Entrega); sem permissão, esses arquivos são pulados |
 | Corrigir marcados (Registro) | Apaga as entradas órfãs marcadas | Sim, pelo backup `.reg` oferecido antes | Para entradas do sistema (HKLM) |
+| Aplicar marcados (Jogos: ajustes) | Volta os ajustes marcados ao padrão do Windows (valores do registro, tipo de inicialização de serviços, plano de energia) | Sim, pelo backup `.reg` oferecido antes; o plano de energia que você usava continua em *Opções de Energia* | Para políticas, serviços e outros itens do sistema |
+| Aplicar marcados (Jogos: placa de vídeo) | Põe os executáveis do jogo em *Alto desempenho* em `HKCU\Software\Microsoft\DirectX\UserGpuPreferences` | Sim: botão direito > *Voltar este jogo para "Windows decide"* | Não |
+| Abrir nas Configurações (recomendações de Jogos) | Abre uma página do Windows; o OpenCleaner não muda nada | — | Não |
 | Atualizar marcados (programas) | O winget baixa e instala a versão nova de cada programa marcado | Depende do programa | O instalador do programa pode pedir |
 | Instalar marcados (drivers) | Cria um ponto de restauração e instala os drivers pelo Windows Update | Sim, pela Restauração do Sistema ou por *Reverter driver* | Sim |
 | Desinstalar | Abre o desinstalador do próprio programa | Não | Depende do programa |
@@ -167,7 +193,10 @@ O app abre **sem** pedir administrador. Quando uma ação precisa, ele explica o
 **O que o OpenCleaner lê no seu PC:** as pastas e chaves de registro dos itens de limpeza, a lista de
 programas instalados e de inicialização, os processos abertos (para avisar quando um navegador está
 aberto e travando arquivos), o espaço em disco e o nome do Windows, do processador e da memória
-(mostrados na Verificação de saúde).
+(mostrados na Verificação de saúde). Para a página Jogos, também lê os ajustes de jogos listados acima, o
+tipo de inicialização dos serviços dos navegadores e do Windows Update, a lista de pacotes da Microsoft
+Store, as placas de vídeo e a bateria, e onde estão seus jogos (as bibliotecas da Steam e da Epic Games e a
+lista de jogos que o Windows já viu rodar).
 
 **O que ele grava:**
 
@@ -175,13 +204,15 @@ aberto e travando arquivos), o espaço em disco e o nome do Windows, do processa
 |---|---|
 | `%AppData%\OpenCleaner\OpenCleaner.ini` | Suas escolhas de itens e opções |
 | `%AppData%\OpenCleaner\Backups\` | Backups `.reg` que você decidir salvar |
+| `HKCU\Software\Microsoft\DirectX\UserGpuPreferences` | A preferência de placa de vídeo dos jogos em que você aplicar (Jogos) |
 | `%AppData%\OpenCleaner\auto.log` | Resultado das limpezas automáticas (`/AUTO`) |
 | `%LocalAppData%\Programs\OpenCleaner\` | O app e o desinstalador (só com o instalador) |
 | Menu Iniciar e `HKCU\...\Uninstall\OpenCleaner` | Atalho e a entrada em *Apps e recursos* (só com o instalador) |
 
 **Rede:** o OpenCleaner não tem servidor, conta nem telemetria. Ele só usa a internet quando você
 pede: **Atualizar programas** consulta o catálogo do winget (Microsoft) e **Atualizar drivers**
-consulta o Windows Update (Microsoft). O app não se atualiza sozinho nem inicia com o Windows.
+consulta o Windows Update (Microsoft). Aplicar o item dos apps do Xbox ausentes abre o app da Microsoft
+Store na página do app. O OpenCleaner não se atualiza sozinho nem inicia com o Windows.
 
 ## Proteções contra estragos
 
@@ -195,6 +226,11 @@ consulta o Windows Update (Microsoft). O app não se atualiza sozinho nem inicia
 - Duplicados e arquivos do analisador de disco vão para a Lixeira, nunca são apagados direto.
 - Em *Opções > Nunca apagar*, você protege qualquer pasta de todas as regras.
 - Opcional: **exclusão segura**, que sobrescreve cada arquivo com zeros antes de apagar.
+- Jogos: a lista de ajustes é fixa no código (não é um arquivo de regras que qualquer um edita), aplicar se
+  limita a apagar um valor, gravar um valor conhecido, mudar o tipo de inicialização de um serviço e ativar o
+  plano Equilibrado, e as recomendações nunca gravam nada. Itens que parecem escolha do usuário (quase todos
+  os apps desligados em segundo plano, um por um; políticas do Defender com a Proteção contra Adulteração
+  ligada) vêm desmarcados; políticas do Windows Update num PC gerenciado por WSUS ficam de fora.
 
 O modelo de ameaças, cada defesa e as limitações conhecidas estão em [SECURITY.md](SECURITY.md#política-de-segurança).
 
@@ -240,10 +276,20 @@ Sim. Só *Atualizar programas* e *Atualizar drivers* precisam de conexão.
 Depende do uso: caches de navegador e de apps costumam somar de centenas de MB a alguns GB. A
 análise mostra o valor exato antes de apagar qualquer coisa.
 
+**O OpenCleaner aumenta o FPS?**
+Ele não promete FPS. A página Jogos desfaz o que derruba o desempenho (Modo de Jogo desligado, plano de
+energia de PC de mesa num notebook, jogo rodando na placa de vídeo integrada) e mostra as opções do Windows
+que ajudam, explicando cada uma. "Boosters" que prometem FPS desligando dezenas de coisas de uma vez
+costumam quebrar o login, as atualizações e a segurança.
+
+**Por que o cache de shaders não é mais limpo por padrão?**
+Apagá-lo obriga cada jogo a recompilar os shaders, e as primeiras partidas travam. Ele continua na
+*Limpeza personalizada*, desmarcado, para resolver problemas gráficos ou depois de trocar de placa de vídeo.
+
 **Qual a diferença para o CCleaner?**
 O OpenCleaner é gratuito por completo, de código aberto e sem telemetria. Ele não tem o otimizador de
-desempenho nem o limpador de espaço livre do CCleaner, e usa o winget e o Windows Update, fontes
-oficiais da Microsoft, para atualizar programas e drivers. A análise do funcionamento do CCleaner que
+desempenho nem o limpador de espaço livre do CCleaner (a página Jogos só desfaz mudanças e aponta opções do
+Windows), e usa o winget e o Windows Update, fontes oficiais da Microsoft, para atualizar programas e drivers. A análise do funcionamento do CCleaner que
 orientou o projeto está em [docs/ANALISE.md](docs/ANALISE.md).
 
 **O app fica rodando em segundo plano?**
@@ -289,23 +335,18 @@ dois idiomas. Com `-Drivers`, também consulta o Windows Update.
 O `tests\run-real.ps1` executa cada funcionalidade de verdade numa pasta sandbox que espelha os locais de
 cada regra, cria entradas de registro e de inicialização chamadas `OpenCleanerTest` (removidas no final),
 ataca o motor (troca por junção, links físicos, regras maliciosas, DLL plantada) e mede o desempenho no disco
-real, só lendo. O `tests\run-installer-tests.ps1` instala, atualiza com o app aberto e desinstala de verdade,
-preservando as suas configurações.
-
-O `testsun-real.ps1` executa cada funcionalidade de verdade numa pasta sandbox que espelha os locais de
-cada regra, cria entradas de registro e de inicialização chamadas `OpenCleanerTest` (removidas no final),
-ataca o motor (troca por junção, links físicos, regras maliciosas, DLL plantada) e mede o desempenho no disco
-real, só lendo. O `testsun-installer-tests.ps1` instala, atualiza com o app aberto e desinstala de verdade,
-preservando as suas configurações.
+real, só lendo. Os testes de Jogos usam sandboxes de registro, serviços e bibliotecas de jogos em
+`HKCU\Software\OpenCleanerTest` e `%TEMP%`; nada muda no PC de verdade. O `tests\run-installer-tests.ps1`
+instala, atualiza com o app aberto e desinstala de verdade, preservando as suas configurações.
 
 ```
-src/Core/       motor: regras (formato winapp2), limpeza, registro, atualizadores, ferramentas, configurações
+src/Core/       motor: regras (formato winapp2), limpeza, registro, atualizadores, ferramentas, jogos, configurações
 src/UI/         interface WinForms e o renderizador dos ícones Lucide
 rules/          builtin.ini: as regras de limpeza embutidas, em texto
 installer/      instalador por usuário (Setup.cs) e o script de distribuição
 assets/         ícone do app e ícones Lucide em SVG
 tests/          teste de fumaça
-docs/           análise do CCleaner e capturas de tela
+docs/           análise do CCleaner, o plano da página Jogos (PLANO-JOGOS.md) e capturas de tela
 ```
 
 **Traduções:** os textos da interface ficam ao lado da tradução no código, como `L.T("português", "English")`;
@@ -315,7 +356,7 @@ as regras de limpeza usam `Item=`/`ItemEn=`, `Group=`/`GroupEn=` e `Warning=`/`W
 O GitHub Actions compila e publica a release com o instalador, o zip e o `SHA256SUMS.txt`.
 
 ```bash
-git tag -a v1.0.1 -m "OpenCleaner 1.0.1" && git push origin main --follow-tags
+git tag -a v1.1.0 -m "OpenCleaner 1.1.0" && git push origin main --follow-tags
 ```
 
 ### Identidade visual

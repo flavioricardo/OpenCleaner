@@ -7,8 +7,8 @@
 # OpenCleaner
 
 **Free and open-source PC cleaner for Windows.**
-Frees up disk space, cleans browsers, fixes the registry, updates programs and drivers and
-manages startup, with no telemetry, no ads and no paid tier.
+Frees up disk space, cleans browsers, fixes the registry, updates programs and drivers, manages
+startup and undoes what "game boosters" break, with no telemetry, no ads and no paid tier.
 
 [![Latest release](https://img.shields.io/github/v/release/flavioricardo/OpenCleaner?label=release&color=0E7C66)](https://github.com/flavioricardo/OpenCleaner/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/flavioricardo/OpenCleaner/total?label=downloads&color=0E7C66)](https://github.com/flavioricardo/OpenCleaner/releases)
@@ -51,7 +51,7 @@ a complete system cleaner and stops there:
 - **English and Portuguese**: the app and the installer follow the Windows language, and you can switch at any time.
 - **No telemetry**: the app sends nothing about you or your PC.
 - **Transparent**: the code is right here, and every cleaning item shows exactly which files will go.
-- **Lightweight**: a single executable of about 230 KB, with no background service and no startup entry.
+- **Lightweight**: a single executable of about 340 KB, with no background service and no startup entry.
 - **Careful**: analyzing never deletes anything; destructive actions ask for confirmation; passwords and cookies start unchecked.
 
 ## Download and install
@@ -88,8 +88,8 @@ your settings and registry backups.
 ### Health check
 
 Your PC on one screen: how much of the system drive is used, how much **can be freed** (the hatched part
-of the meter), orphaned registry entries, programs that open with Windows and programs with a newer
-version available. The check only reads; nothing changes until you click **Clean**.
+of the meter), orphaned registry entries, programs that open with Windows, programs with a newer
+version available and gaming settings to undo. The check only reads; nothing changes until you click **Clean**.
 
 ### Custom clean
 
@@ -101,7 +101,7 @@ files; then click **Run cleaner**.
 
 | Group | What it cleans |
 |---|---|
-| Windows: System | Recycle Bin, temporary files (with the option to keep files newer than 24 h), memory dumps, Chkdsk file fragments, Windows logs and event trace logs, Windows Error Reporting, DNS cache, Delivery Optimization, Windows Update downloads, old Prefetch data, GPU shader cache (DirectX, NVIDIA, AMD), driver installation logs, clipboard |
+| Windows: System | Recycle Bin, temporary files (with the option to keep files newer than 24 h), memory dumps, Chkdsk file fragments, Windows logs and event trace logs, Windows Error Reporting, DNS cache, Delivery Optimization, Windows Update downloads, old Prefetch data, GPU shader cache (DirectX, NVIDIA, AMD; unchecked, because games recompile it and stutter), driver installation logs, clipboard |
 | Windows: Explorer | Thumbnail cache, recent documents, Run history, other recent item lists, taskbar jump lists |
 | Browsers | **Google Chrome, Microsoft Edge, Brave, Vivaldi, Opera and Opera GX**: cache, browsing and download history, cookies, session, saved form data and saved passwords. **Mozilla Firefox**: cache, cookies, session, saved form data and crash reports |
 | Applications | Discord, Microsoft Teams (classic and new), Zoom, Spotify, Visual Studio Code, Steam, OneDrive, Java, Telegram Desktop, NVIDIA installation files, 7-Zip history, Paint, Regedit and Remote Desktop |
@@ -118,6 +118,27 @@ Finds entries that point to files and programs that no longer exist, in seven ca
 DLLs, program paths, programs already removed, startup without a file, names of removed programs,
 installer folders and missing fonts. Before fixing, it offers a **`.reg` backup** you can restore with a
 double-click.
+
+### Gaming
+
+<img src="docs/screenshots/en/gaming.png" width="760" alt="Gaming check: settings left by optimizers and Windows options for gaming">
+
+"Game boosters" and "FPS optimizers" change dozens of Windows settings at once, without showing which, and
+many of those changes outlive the program by years. Some make things worse: they turn off Game Mode, remove
+the Xbox apps that Game Pass games use to sign in, or keep a laptop on a desktop power plan. The **Gaming**
+page finds what they left behind, explains each item and puts back the Windows default when you check it
+and click **Apply checked**. The check runs when you open the page and only reads.
+
+| Group | What it shows | What applying does |
+|---|---|---|
+| Security (left by optimizers) | Chrome or Edge update services disabled, Windows Update off, Microsoft Defender turned off by policy, UAC off, Spectre/Meltdown protections off | Puts each service back to its default through the Service Control Manager, deletes the policies, turns UAC back on. UAC and the processor protections need a restart |
+| Left by optimizers | Game Mode off, a policy that blocks the Xbox Game Bar, Xbox Identity Provider/TCUI or Gaming Services missing, every app barred from running in the background, a copy of *Ultimate Performance* active on a laptop | Turns Game Mode back on, deletes the policies, switches to the Balanced plan. For the Xbox apps it only **opens the Microsoft Store page**: you click *Get* |
+| Graphics card for games (laptops with two graphics cards) | Each game found (Steam, Epic Games and the games Windows has seen run) that is not set to *High performance* | Sets *High performance* for the game, the same option as *Settings > System > Display > Graphics* |
+| Recommended for gaming | Background recording on, hardware-accelerated GPU scheduling off, optimizations for windowed games off (Windows 11), "Enhance pointer precision" on | Nothing: the link opens the right Windows page and you decide |
+| Performance × security | Memory integrity on | Nothing: Microsoft says turning it off can help some games, at the cost of protection. OpenCleaner neither recommends nor changes it |
+
+There is no "boost" button: tweaks with no measurable gain in current games (Nagle, `NetworkThrottlingIndex`,
+timer resolution, "RAM cleaners") are deliberately left out, and privacy choices are yours.
 
 ### Update programs
 
@@ -151,6 +172,9 @@ and published by the manufacturers) and installs the ones you check, creating a 
 | Analyze, Check now, Search, Scan | Read only. Nothing changes. | — | No |
 | Run cleaner / Clean | Deletes the files of the checked items (directly, not through the Recycle Bin), empties the Recycle Bin, clears the DNS cache and clipboard, and removes recent item lists from the registry | No | Only for system folders (`C:\Windows\Temp`, Prefetch, Windows Update, Delivery Optimization); without permission those files are skipped |
 | Fix checked (Registry) | Deletes the checked orphaned entries | Yes, with the `.reg` backup offered first | For system entries (HKLM) |
+| Apply checked (Gaming: settings) | Puts the checked settings back to the Windows default (registry values, service startup types, power plan) | Yes, with the `.reg` backup offered first; the power plan you were using stays in *Power Options* | For policies, services and other system items |
+| Apply checked (Gaming: graphics card) | Sets *High performance* for the game's executables in `HKCU\Software\Microsoft\DirectX\UserGpuPreferences` | Yes: right-click > *Set this game back to "Let Windows decide"* | No |
+| Open in Settings (Gaming recommendations) | Opens a Windows page; OpenCleaner changes nothing | — | No |
 | Update checked (programs) | winget downloads and installs the new version of each checked program | Depends on the program | The program's installer may ask |
 | Install checked (drivers) | Creates a restore point and installs the drivers through Windows Update | Yes, with System Restore or *Roll back driver* | Yes |
 | Uninstall | Opens the program's own uninstaller | No | Depends on the program |
@@ -166,7 +190,10 @@ offers *Restart as administrator*; the current mode shows at the bottom of the s
 
 **What OpenCleaner reads on your PC:** the folders and registry keys of the cleaning items, the lists of
 installed and startup programs, running processes (to warn you when a browser is open and locking files),
-disk space, and the names of your Windows edition, processor and memory (shown in the Health check).
+disk space, and the names of your Windows edition, processor and memory (shown in the Health check). For
+the Gaming page, it also reads the gaming settings listed above, the startup type of the browser and Windows
+Update services, the list of Microsoft Store packages, your graphics cards and battery, and where your games
+are (the Steam and Epic Games libraries and the list of games Windows has seen run).
 
 **What it writes:**
 
@@ -174,13 +201,15 @@ disk space, and the names of your Windows edition, processor and memory (shown i
 |---|---|
 | `%AppData%\OpenCleaner\OpenCleaner.ini` | Your item choices and options |
 | `%AppData%\OpenCleaner\Backups\` | `.reg` backups you choose to save |
+| `HKCU\Software\Microsoft\DirectX\UserGpuPreferences` | The graphics card preference of the games you apply it to (Gaming) |
 | `%AppData%\OpenCleaner\auto.log` | Results of automatic cleanings (`/AUTO`) |
 | `%LocalAppData%\Programs\OpenCleaner\` | The app and the uninstaller (installer only) |
 | Start menu and `HKCU\...\Uninstall\OpenCleaner` | The shortcut and the *Apps & features* entry (installer only) |
 
 **Network:** OpenCleaner has no server, no account and no telemetry. It only goes online when you ask:
 **Update programs** queries the winget catalog (Microsoft) and **Update drivers** queries Windows Update
-(Microsoft). The app doesn't update itself or start with Windows.
+(Microsoft). Applying the missing Xbox apps item opens the Microsoft Store app on that app's page. The app
+doesn't update itself or start with Windows.
 
 ## Safeguards
 
@@ -194,6 +223,11 @@ disk space, and the names of your Windows edition, processor and memory (shown i
 - Duplicates and disk analyzer files go to the Recycle Bin and are never deleted directly.
 - In *Options > Never delete*, you can protect any folder from every rule.
 - Optional **secure deletion** overwrites each file with zeros before deleting it.
+- Gaming: the list of settings is fixed in the code (not a rules file anyone can edit), applying is limited
+  to deleting a value, writing a known value, changing a service's startup type and switching to the Balanced
+  plan, and recommendations never write anything. Items that look like a deliberate choice (most apps turned
+  off in the background one by one, Defender policies with Tamper Protection on) start unchecked; Windows
+  Update policies on a PC managed by WSUS are left alone.
 
 The threat model, every defense and the known limitations are in [SECURITY.md](SECURITY.md).
 
@@ -238,10 +272,20 @@ Yes. Only *Update programs* and *Update drivers* need a connection.
 It depends on how you use your PC: browser and app caches usually add up to hundreds of MB or a few GB.
 The analysis shows the exact amount before anything is deleted.
 
+**Does OpenCleaner boost FPS?**
+It doesn't promise FPS. The Gaming page undoes what drags performance down (Game Mode off, a desktop power
+plan on a laptop, a game running on the integrated graphics card) and shows the Windows options that help,
+explaining each one. "Boosters" that promise FPS by switching off dozens of things at once tend to break
+sign-in, updates and security instead.
+
+**Why isn't the shader cache cleaned by default anymore?**
+Deleting it makes every game recompile its shaders, so the first matches stutter. It's still in *Custom
+clean*, unchecked, for fixing graphics problems or after changing graphics cards.
+
 **How is it different from CCleaner?**
 OpenCleaner is completely free, open source and has no telemetry. It doesn't have CCleaner's performance
-optimizer or free-space wiper, and it uses winget and Windows Update, Microsoft's official sources, to
-update programs and drivers. The analysis of how CCleaner works that guided this project is in
+optimizer or free-space wiper (the Gaming page only undoes changes and points to Windows options), and it
+uses winget and Windows Update, Microsoft's official sources, to update programs and drivers. The analysis of how CCleaner works that guided this project is in
 [docs/ANALISE.md](docs/ANALISE.md) (in Portuguese).
 
 **Does the app keep running in the background?**
@@ -286,23 +330,18 @@ it also queries Windows Update.
 `tests\run-real.ps1` runs every feature for real in a sandbox folder that mirrors each rule's locations,
 creates registry and startup entries named `OpenCleanerTest` (removed at the end), attacks the engine
 (junction swaps, hard links, malicious rules, planted DLLs) and measures performance on the real disk,
-read-only. `tests\run-installer-tests.ps1` installs, updates with the app open and uninstalls for real,
-keeping your settings.
-
-`testsun-real.ps1` runs every feature for real in a sandbox folder that mirrors each rule's locations,
-creates registry and startup entries named `OpenCleanerTest` (removed at the end), attacks the engine
-(junction swaps, hard links, malicious rules, planted DLLs) and measures performance on the real disk,
-read-only. `testsun-installer-tests.ps1` installs, updates with the app open and uninstalls for real,
-keeping your settings.
+read-only. The Gaming checks run against registry, service and game-library sandboxes under
+`HKCU\Software\OpenCleanerTest` and `%TEMP%`; nothing on the real PC changes. `tests\run-installer-tests.ps1`
+installs, updates with the app open and uninstalls for real, keeping your settings.
 
 ```
-src/Core/       engine: rules (winapp2 format), cleaning, registry, updaters, tools, settings, languages
+src/Core/       engine: rules (winapp2 format), cleaning, registry, updaters, tools, gaming, settings, languages
 src/UI/         WinForms interface and the Lucide icon renderer
 rules/          builtin.ini: the built-in cleaning rules, as text (Portuguese and English)
 installer/      per-user installer (Setup.cs) and the distribution script
 assets/         app icon and Lucide SVG icons
 tests/          smoke test
-docs/           CCleaner analysis and screenshots
+docs/           CCleaner analysis, the Gaming plan (PLANO-JOGOS.md) and screenshots
 ```
 
 **Translations:** interface text sits next to its translation in the code, as `L.T("Portuguese", "English")`;
@@ -312,7 +351,7 @@ cleaning rules use `Item=`/`ItemEn=`, `Group=`/`GroupEn=` and `Warning=`/`Warnin
 the tag. GitHub Actions builds and publishes the release with the installer, the zip and `SHA256SUMS.txt`.
 
 ```bash
-git tag -a v1.0.1 -m "OpenCleaner 1.0.1" && git push origin main --follow-tags
+git tag -a v1.1.0 -m "OpenCleaner 1.1.0" && git push origin main --follow-tags
 ```
 
 ### Visual identity

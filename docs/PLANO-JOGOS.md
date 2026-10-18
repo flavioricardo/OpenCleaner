@@ -1,6 +1,6 @@
 # Plano: menu Jogos
 
-Status: etapas 1 a 6 implementadas. O núcleo está em `src/Core/Games.cs`, `GameLibrary.cs` e
+Status: etapas 1 a 7 implementadas; versão 1.1.0 pronta, ainda sem tag nem publicação. O núcleo está em `src/Core/Games.cs`, `GameLibrary.cs` e
 `GpuPreference.cs`; a interface, em `src/UI/GamesPage.cs`, no item "Jogos" da barra lateral e num 4º
 cartão na Verificação de saúde. Testes: `tests/RealTests.cs` e capturas em `tests/SmokeTest.cs`. Os quatro
 cartões ficam sempre numa linha: duas linhas não cabem na altura mínima da janela.
