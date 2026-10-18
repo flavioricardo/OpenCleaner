@@ -20,6 +20,8 @@ namespace OpenCleaner.Core
         public RegistryKey Hkcu;
         public readonly List<string> SteamRoots = new List<string>();
         public string EpicManifests;
+        /// <summary>Pastas XboxGames (onde o app Xbox instala os jogos do PC Game Pass), uma por unidade.</summary>
+        public readonly List<string> XboxGamesRoots = new List<string>();
 
         public static GameSources System()
         {
@@ -31,6 +33,15 @@ namespace OpenCleaner.Core
             }
             s.SteamRoots.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam"));
             s.EpicManifests = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), @"Epic\EpicGamesLauncher\Data\Manifests");
+            try
+            {
+                foreach (var d in DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.Fixed && d.IsReady))
+                {
+                    string x = Path.Combine(d.RootDirectory.FullName, "XboxGames");
+                    if (Directory.Exists(x)) s.XboxGamesRoots.Add(x);
+                }
+            }
+            catch { }
             return s;
         }
     }
@@ -45,7 +56,7 @@ namespace OpenCleaner.Core
 
         /// <summary>Launchers e auxiliares: não são o jogo.</summary>
         static readonly Regex Helper = new Regex(
-            @"^(unins.*|.*crashhandler.*|.*crashreport.*|.*redist.*|vc_?redist.*|dxsetup|dxwebsetup|directx.*|easyanticheat.*|beservice.*|battleye.*|" +
+            @"^(unins.*|gamelaunchhelper|.*crashhandler.*|.*crashreport.*|.*redist.*|vc_?redist.*|dxsetup|dxwebsetup|directx.*|easyanticheat.*|beservice.*|battleye.*|" +
             @"cefsharp.*|qtwebengineprocess|.*helper|.*setup|.*installer|.*updater|steam|steamwebhelper|steamservice|epicgameslauncher|" +
             @"riotclient.*|battle\.net|eadesktop|ealauncher|galaxyclient|upc|ubisoftconnect|ubisoftgamelauncher)\.exe$",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
@@ -58,6 +69,7 @@ namespace OpenCleaner.Core
             var games = new List<InstalledGame>();
             try { Steam(s, games); } catch { }
             try { Epic(s, games); } catch { }
+            try { Xbox(s, games); } catch { }
             List<string> seen = new List<string>();
             try { seen = SeenByWindows(s.Hkcu); } catch { }
 
@@ -74,8 +86,8 @@ namespace OpenCleaner.Core
                 games.Add(game);
             }
 
-            // Steam sem nada visto pelo Windows: palpite pelos .exe da pasta.
-            foreach (var g in games.Where(g => g.Store == "Steam" && g.Exes.Count == 0))
+            // Steam e Xbox sem nada visto pelo Windows: palpite pelos .exe da pasta.
+            foreach (var g in games.Where(g => (g.Store == "Steam" || g.Store == "Xbox") && g.Exes.Count == 0))
                 g.Exes.AddRange(GuessExes(g.Folder));
             games.RemoveAll(g => g.Exes.Count == 0);
             return games.OrderBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
@@ -213,6 +225,24 @@ namespace OpenCleaner.Core
                 catch { }
             }
             return result;
+        }
+
+        // ---- Xbox / PC Game Pass: XboxGames\<jogo>\Content ----
+
+        /// <summary>
+        /// O app Xbox instala os jogos do PC Game Pass em X:\XboxGames\&lt;jogo&gt;\Content, com executáveis comuns
+        /// (a preferência de GPU por caminho vale para eles). Jogos empacotados antigos, em WindowsApps, ficam de fora.
+        /// </summary>
+        static void Xbox(GameSources s, List<InstalledGame> games)
+        {
+            foreach (var root in s.XboxGamesRoots.Where(Directory.Exists))
+                foreach (var dir in Directory.EnumerateDirectories(root))
+                {
+                    if (Util.IsReparsePoint(dir)) continue;
+                    string content = Normalize(Path.Combine(dir, "Content"));
+                    if (content == null || !Directory.Exists(content) || games.Any(g => g.Folder.Equals(content, StringComparison.OrdinalIgnoreCase))) continue;
+                    games.Add(new InstalledGame { Name = Path.GetFileName(dir), Store = "Xbox", Folder = content });
+                }
         }
 
         // ---- Epic Games: um .item (JSON) por jogo ----

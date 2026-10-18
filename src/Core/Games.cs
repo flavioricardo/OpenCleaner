@@ -58,6 +58,40 @@ namespace OpenCleaner.Core
         public Func<bool> MemoryIntegrityRunning;
         /// <summary>Muda o tipo de inicialização de um serviço: nome, Start (2 automático, 3 manual) e se é atrasado.</summary>
         public Func<string, int, bool, bool> SetServiceStart;
+        /// <summary>Saída de "bcdedit /enum {current}"; null sem administrador ou se falhar.</summary>
+        public Func<string> BootConfig;
+        /// <summary>Apaga um valor da entrada de boot atual ("bcdedit /deletevalue {current} nome").</summary>
+        public Func<string, bool> DeleteBootValue;
+
+        /// <summary>Únicos valores do BCD que o OpenCleaner lê e pode apagar: o relógio do sistema que boosters forçam.</summary>
+        public static readonly string[] BootClockValues = { "useplatformclock", "useplatformtick", "disabledynamictick" };
+
+        static string Bcdedit(string args)
+        {
+            string exe = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), @"Sysnative\bcdedit.exe");
+            if (!File.Exists(exe)) exe = Path.Combine(Environment.SystemDirectory, "bcdedit.exe"); // processo de 64 bits
+            var psi = new ProcessStartInfo(exe, args) { CreateNoWindow = true, UseShellExecute = false, RedirectStandardOutput = true };
+            using (var p = Process.Start(psi))
+            {
+                string output = p.StandardOutput.ReadToEnd();
+                p.WaitForExit(30000);
+                return p.HasExited && p.ExitCode == 0 ? output : null;
+            }
+        }
+
+        static string ReadBootConfig()
+        {
+            if (!Util.IsAdmin()) return null; // sem administrador o bcdedit nega a leitura
+            try { return Bcdedit("/enum {current}"); }
+            catch { return null; }
+        }
+
+        static bool DeleteBootClockValue(string name)
+        {
+            if (!BootClockValues.Contains(name)) return false; // nada fora da lista vira argumento do bcdedit
+            try { return Bcdedit("/deletevalue {current} " + name) != null; }
+            catch { return false; }
+        }
 
         public static GameContext System()
         {
@@ -79,7 +113,9 @@ namespace OpenCleaner.Core
                     catch { return false; }
                 },
                 MemoryIntegrityRunning = HvciRunning,
-                SetServiceStart = ScmSetStart
+                SetServiceStart = ScmSetStart,
+                BootConfig = ReadBootConfig,
+                DeleteBootValue = DeleteBootClockValue
             };
         }
 
@@ -204,9 +240,10 @@ namespace OpenCleaner.Core
         const string CapturesPage = "ms-settings:gaming-gamedvr";
         const string GraphicsPage = "ms-settings:display-advancedgraphics";
         const string CoreIsolationPage = "windowsdefender://coreisolation";
+        const string PowerPage = "ms-settings:powersleep";
 
         /// <summary>As únicas páginas que GameContext.OpenSettings abre (além de main.cpl).</summary>
-        public static readonly HashSet<string> SettingsPages = new HashSet<string>(StringComparer.Ordinal) { CapturesPage, GraphicsPage, CoreIsolationPage };
+        public static readonly HashSet<string> SettingsPages = new HashSet<string>(StringComparer.Ordinal) { CapturesPage, GraphicsPage, CoreIsolationPage, PowerPage };
 
         /// <summary>Apps de sistema que fazem o login na conta Xbox dos jogos, com o ID de cada um na Microsoft Store.</summary>
         static readonly string[,] XboxApps =
@@ -228,9 +265,9 @@ namespace OpenCleaner.Core
         {
             var found = new List<GameFinding>();
             foreach (var check in new Action<GameContext, List<GameFinding>>[]
-                { BrowserUpdates, WindowsUpdate, DefenderPolicy, UacOff, CpuMitigations,
+                { BrowserUpdates, WindowsUpdate, DefenderPolicy, UacOff, CpuMitigations, BootClock,
                   GameMode, GameDvrPolicyCheck, XboxSignIn, Background, PowerPlan,
-                  BackgroundRecording, HardwareScheduling, WindowedOptimizations, MousePrecision, MemoryIntegrity })
+                  BackgroundRecording, HardwareScheduling, WindowedOptimizations, MousePrecision, PowerMode, MemoryIntegrity })
             {
                 try { check(c, found); }
                 catch { }
@@ -647,6 +684,36 @@ namespace OpenCleaner.Core
             found.Add(f);
         }
 
+        static void BootClock(GameContext c, List<GameFinding> found)
+        {
+            string config = c.BootConfig == null ? null : c.BootConfig();
+            if (string.IsNullOrEmpty(config)) return;
+            // Os nomes dos valores não são traduzidos pelo bcdedit; os valores ("Yes", "Sim") são. Qualquer valor
+            // presente já é diferente do padrão (o Windows não grava nenhum deles), e apagar é sempre seguro.
+            var present = new List<KeyValuePair<string, string>>();
+            foreach (var line in config.Split('\n'))
+            {
+                var m = Regex.Match(line.Trim(), @"^(\S+)\s+(.+)$");
+                if (m.Success && GameContext.BootClockValues.Contains(m.Groups[1].Value.ToLowerInvariant()))
+                    present.Add(new KeyValuePair<string, string>(m.Groups[1].Value.ToLowerInvariant(), m.Groups[2].Value.Trim()));
+            }
+            if (present.Count == 0) return;
+            var f = new GameFinding
+            {
+                Id = "boot-clock",
+                NeedsAdmin = true,
+                Name = L.T("Relógio do sistema forçado na configuração de inicialização", "System clock forced in the boot configuration"),
+                Why = L.T("Boosters gravam useplatformclock, useplatformtick ou disabledynamictick na configuração de inicialização (BCD) prometendo menos latência. Forçar o relógio da plataforma (HPET) costuma deixar os jogos mais lentos, e desligar o tick dinâmico gasta mais energia. Sem esses valores, o Windows escolhe o melhor relógio para o seu hardware. Exige reiniciar, e o backup .reg não cobre a configuração de inicialização.",
+                          "Boosters write useplatformclock, useplatformtick or disabledynamictick to the boot configuration (BCD) promising lower latency. Forcing the platform clock (HPET) tends to make games slower, and turning off the dynamic tick uses more power. Without these values, Windows picks the best clock for your hardware. Requires a restart, and the .reg backup does not cover the boot configuration."),
+                Location = "bcdedit {current}: " + string.Join(", ", present.Select(p => p.Key + " = " + p.Value)),
+                Current = string.Join(", ", present.Select(p => p.Key)),
+                Expected = L.T("padrão do Windows", "Windows default"),
+                AfterApply = L.T("Reinicie o PC para o relógio do sistema voltar ao padrão.", "Restart the PC for the system clock to go back to the default."),
+                Run = () => present.All(p => c.DeleteBootValue != null && c.DeleteBootValue(p.Key))
+            };
+            found.Add(f);
+        }
+
         // ---- Recomendado para jogos e Desempenho × segurança: só leem e abrem a página do Windows ----
 
         static GameFinding Advice(GameKind kind, string id, string page)
@@ -711,6 +778,35 @@ namespace OpenCleaner.Core
             f.Location = Where(c.Hkcu, Mouse, "MouseSpeed");
             f.Current = L.T("ligado", "on");
             f.Expected = L.T("desligar, para jogos de tiro", "turn off for shooters");
+            found.Add(f);
+        }
+
+        // Modo de energia (o controle deslizante): GUIDs documentados em "Customize the Windows performance power slider".
+        const string BetterBatteryOverlay = "961cc777-2547-4f9d-8174-7d86181b8a7a";
+        const string BestPerformanceOverlay = "ded574b5-45a0-4f42-8737-46345c09c238";
+
+        static void PowerMode(GameContext c, List<GameFinding> found)
+        {
+            // Só em notebook (em PC de mesa o controle depende do fabricante) e com o Equilibrado ativo
+            // (com outro plano o Windows esconde o controle).
+            if (!c.HasBattery) return;
+            string active, ac;
+            using (var k = c.Hklm.OpenSubKey(PowerSchemes))
+            {
+                if (k == null) return;
+                active = Util.ReadString(k, "ActivePowerScheme");
+                ac = Util.ReadString(k, "ActiveOverlayAcPowerScheme");
+            }
+            if (!string.Equals(active, Balanced, StringComparison.OrdinalIgnoreCase)) return;
+            if (string.Equals(ac, BestPerformanceOverlay, StringComparison.OrdinalIgnoreCase)) return;
+            var f = Advice(GameKind.Recommended, "power-mode", PowerPage);
+            f.Name = L.T("Modo de energia na tomada não é o de melhor desempenho", "Plugged-in power mode is not best performance");
+            f.Why = L.T("Ligado na tomada, o modo de energia \"Melhor desempenho\" deixa o processador acelerar mais e por mais tempo, sem o custo de bateria. Ele vale só na tomada; na bateria, o Windows continua usando o modo que você escolheu para ela. Fica em Configurações > Sistema > Energia, ou no ícone da bateria na barra de tarefas.",
+                        "When plugged in, the \"Best performance\" power mode lets the processor boost higher and for longer, at no battery cost. It applies only when plugged in; on battery, Windows keeps the mode you chose for it. It is in Settings > System > Power, or in the battery icon on the taskbar.");
+            f.Location = Where(c.Hklm, PowerSchemes, "ActiveOverlayAcPowerScheme");
+            f.Current = string.Equals(ac, BetterBatteryOverlay, StringComparison.OrdinalIgnoreCase)
+                ? L.T("melhor duração da bateria", "better battery") : L.T("equilibrado", "balanced");
+            f.Expected = L.T("melhor desempenho, na tomada", "best performance, plugged in");
             found.Add(f);
         }
 

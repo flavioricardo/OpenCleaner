@@ -5,9 +5,27 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Custom clean: cache and logs of the **Epic Games Launcher**, **Battle.net** and the **EA app**, and logs and
+  crash reports of the **Riot Client**. Cookies, sessions and databases are kept, so nobody is signed out;
+  folders that would need administrator rights are left out.
+- Gaming: **system clock forced in the boot configuration** (`useplatformclock`, `useplatformtick`,
+  `disabledynamictick`, a common booster tweak). Shown only when running as administrator, since reading the
+  BCD needs it; applying deletes only those values and asks for a restart.
+- Gaming: **plugged-in power mode** recommendation on laptops using the Balanced plan when the power mode on
+  AC is not *Best performance* (read-only; opens *Settings > System > Power*).
+- Gaming: **PC Game Pass games** installed by the Xbox app (`XboxGames\<game>\Content`) are found and can be
+  set to the dedicated graphics card; `gamelaunchhelper.exe` is ignored.
+
 ### Changed
 
 - The changelog and the release notes are now in English.
+
+### Security
+
+- Only the three clock values can become `bcdedit` arguments; any other boot setting is never read as a
+  problem nor deleted.
 
 ## [1.1.0] - 2026-10-17
 

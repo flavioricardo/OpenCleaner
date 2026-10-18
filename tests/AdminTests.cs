@@ -60,6 +60,14 @@ static class AdminTests
         Check(!set(Name + " & calc", 2, false) && !set(Name + "\"", 2, false), "nomes com espaço, & ou aspas são recusados antes do Gerenciador de Serviços");
         Check(!set("OpenCleanerTestSvcNaoExiste", 2, false), "serviço inexistente retorna falha, sem exceção");
 
+        Console.WriteLine("== Configuração de inicialização (BCD): só leitura ==");
+        var ctx = GameContext.System();
+        string boot = ctx.BootConfig();
+        Check(boot != null && boot.Contains("{current}"), "como administrador, o bcdedit lê a entrada de boot atual");
+        var clock = GameScanner.Scan(ctx).FirstOrDefault(f => f.Id == "boot-clock");
+        Console.WriteLine("  relógio do sistema neste PC: " + (clock == null ? "padrão do Windows" : clock.Location));
+        Check(!ctx.DeleteBootValue("truncatememory"), "valores fora da lista do relógio nunca são apagados");
+
         Console.WriteLine();
         Console.WriteLine(failures == 0 ? "TUDO OK (" + passes + " verificações)" : failures + " FALHA(S) de " + (passes + failures));
         return failures;

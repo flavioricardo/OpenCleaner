@@ -104,7 +104,7 @@ files; then click **Run cleaner**.
 | Windows: System | Recycle Bin, temporary files (with the option to keep files newer than 24 h), memory dumps, Chkdsk file fragments, Windows logs and event trace logs, Windows Error Reporting, DNS cache, Delivery Optimization, Windows Update downloads, old Prefetch data, GPU shader cache (DirectX, NVIDIA, AMD; unchecked, because games recompile it and stutter), driver installation logs, clipboard |
 | Windows: Explorer | Thumbnail cache, recent documents, Run history, other recent item lists, taskbar jump lists |
 | Browsers | **Google Chrome, Microsoft Edge, Brave, Vivaldi, Opera and Opera GX**: cache, browsing and download history, cookies, session, saved form data and saved passwords. **Mozilla Firefox**: cache, cookies, session, saved form data and crash reports |
-| Applications | Discord, Microsoft Teams (classic and new), Zoom, Spotify, Visual Studio Code, Steam, OneDrive, Java, Telegram Desktop, NVIDIA installation files, 7-Zip history, Paint, Regedit and Remote Desktop |
+| Applications | Discord, Microsoft Teams (classic and new), Zoom, Spotify, Visual Studio Code, Steam, Epic Games Launcher, Battle.net, EA app, Riot Client, OneDrive, Java, Telegram Desktop, NVIDIA installation files, 7-Zip history, Paint, Regedit and Remote Desktop |
 | Advanced | **Custom folders**: any folder you set in *Options* |
 
 With the community **`winapp2.ini`** file (the same format CCleaner accepts), OpenCleaner gets thousands
@@ -132,9 +132,9 @@ and click **Apply checked**. The check runs when you open the page and only read
 | Group | What it shows | What applying does |
 |---|---|---|
 | Security (left by optimizers) | Chrome or Edge update services disabled, Windows Update off, Microsoft Defender turned off by policy, UAC off, Spectre/Meltdown protections off | Puts each service back to its default through the Service Control Manager, deletes the policies, turns UAC back on. UAC and the processor protections need a restart |
-| Left by optimizers | Game Mode off, a policy that blocks the Xbox Game Bar, Xbox Identity Provider/TCUI or Gaming Services missing, every app barred from running in the background, a copy of *Ultimate Performance* active on a laptop | Turns Game Mode back on, deletes the policies, switches to the Balanced plan. For the Xbox apps it only **opens the Microsoft Store page**: you click *Get* |
-| Graphics card for games (laptops with two graphics cards) | Each game found (Steam, Epic Games and the games Windows has seen run) that is not set to *High performance* | Sets *High performance* for the game, the same option as *Settings > System > Display > Graphics* |
-| Recommended for gaming | Background recording on, hardware-accelerated GPU scheduling off, optimizations for windowed games off (Windows 11), "Enhance pointer precision" on | Nothing: the link opens the right Windows page and you decide |
+| Left by optimizers | Game Mode off, a policy that blocks the Xbox Game Bar, Xbox Identity Provider/TCUI or Gaming Services missing, every app barred from running in the background, a copy of *Ultimate Performance* active on a laptop, the system clock forced in the boot configuration (`useplatformclock` and others; shown only as administrator) | Turns Game Mode back on, deletes the policies, switches to the Balanced plan. For the Xbox apps it only **opens the Microsoft Store page**: you click *Get* |
+| Graphics card for games (laptops with two graphics cards) | Each game found (Steam, Epic Games, PC Game Pass and the games Windows has seen run) that is not set to *High performance* | Sets *High performance* for the game, the same option as *Settings > System > Display > Graphics* |
+| Recommended for gaming | Background recording on, hardware-accelerated GPU scheduling off, optimizations for windowed games off (Windows 11), "Enhance pointer precision" on, plugged-in power mode below *Best performance* (laptops) | Nothing: the link opens the right Windows page and you decide |
 | Performance × security | Memory integrity on | Nothing: Microsoft says turning it off can help some games, at the cost of protection. OpenCleaner neither recommends nor changes it |
 
 There is no "boost" button: tweaks with no measurable gain in current games (Nagle, `NetworkThrottlingIndex`,

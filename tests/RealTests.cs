@@ -781,6 +781,69 @@ static class RealTests
                   "Windows 10, agendamento de GPU ligado, precisão do ponteiro desligada e HVCI desligada: só sobra a gravação");
         }
 
+        // Modo de energia: só notebook, só com o Equilibrado ativo, só o modo da tomada.
+        using (var hklm = Registry.CurrentUser.CreateSubKey(TestKey + @"\PowerMode\HKLM"))
+        using (var hkcu = Registry.CurrentUser.CreateSubKey(TestKey + @"\PowerMode\HKCU"))
+        {
+            const string ps = @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes";
+            const string best = "ded574b5-45a0-4f42-8737-46345c09c238", battery = "961cc777-2547-4f9d-8174-7d86181b8a7a";
+            var ctx = new GameContext { Hklm = hklm, Hkcu = hkcu, HasBattery = true };
+            Action<string, string, string> set = (active, ac, dc) =>
+            {
+                using (var k = hklm.CreateSubKey(ps))
+                {
+                    foreach (var n in new[] { "ActivePowerScheme", "ActiveOverlayAcPowerScheme", "ActiveOverlayDcPowerScheme" }) k.DeleteValue(n, false);
+                    if (active != null) k.SetValue("ActivePowerScheme", active);
+                    if (ac != null) k.SetValue("ActiveOverlayAcPowerScheme", ac);
+                    if (dc != null) k.SetValue("ActiveOverlayDcPowerScheme", dc);
+                }
+            };
+            Func<GameFinding> mode = () => GameScanner.Scan(ctx).FirstOrDefault(f => f.Id == "power-mode");
+
+            set(GameScanner.Balanced, null, null);
+            var m = mode();
+            Check(m != null && m.Kind == GameKind.Recommended && m.SettingsUri == "ms-settings:powersleep" && m.Edits.Count == 0 && m.Run == null,
+                  "modo de energia: notebook no Equilibrado sem sobreposição na tomada recebe a recomendação (só leitura)");
+            set(GameScanner.Balanced, battery, null);
+            m = mode();
+            Check(m != null && m.Current == "melhor duração da bateria", "modo de energia: \"melhor duração da bateria\" na tomada é mostrado pelo nome");
+            set(GameScanner.Balanced, best, battery);
+            Check(mode() == null, "modo de energia: já em melhor desempenho na tomada não aparece (o modo da bateria é escolha do usuário)");
+            set("8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", null, null);
+            Check(mode() == null, "modo de energia: com outro plano ativo (o Windows esconde o controle) não aparece");
+            set(GameScanner.Balanced, null, null);
+            ctx.HasBattery = false;
+            Check(mode() == null, "modo de energia: PC de mesa não recebe a recomendação");
+            Check(GameScanner.SettingsPages.Contains("ms-settings:powersleep") && !GameContext.OpenSettings("ms-settings:powersleep&x"), "a página de energia entra no catálogo fixo, e só ela exatamente");
+        }
+
+        // Relógio do sistema no BCD: saída do bcdedit simulada (em inglês e em português); apagar é simulado.
+        using (var hklm = Registry.CurrentUser.CreateSubKey(TestKey + @"\Boot\HKLM"))
+        using (var hkcu = Registry.CurrentUser.CreateSubKey(TestKey + @"\Boot\HKCU"))
+        {
+            string output = null;
+            var deleted = new List<string>();
+            var ctx = new GameContext { Hklm = hklm, Hkcu = hkcu, BootConfig = () => output, DeleteBootValue = n => { deleted.Add(n); return true; } };
+            Func<GameFinding> boot = () => GameScanner.Scan(ctx).FirstOrDefault(f => f.Id == "boot-clock");
+            const string clean = "Windows Boot Loader\r\n-------------------\r\nidentifier              {current}\r\ndevice                  partition=C:\r\npath                    \\Windows\\system32\\winload.efi\r\nrecoveryenabled         Yes\r\nnx                      OptIn\r\n";
+            output = clean;
+            Check(boot() == null, "BCD: entrada sem valores de relógio não é apontada");
+            output = null;
+            Check(boot() == null, "BCD: sem administrador (leitura nula) o item não aparece");
+            output = clean + "useplatformclock        Yes\r\ndisabledynamictick      Yes\r\n";
+            var b = boot();
+            Check(b != null && b.NeedsAdmin && !b.Security && b.Kind == GameKind.Fix && b.AfterApply != null && b.Current == "useplatformclock, disabledynamictick",
+                  "BCD: useplatformclock e disabledynamictick (saída em inglês) viram um conserto que pede administrador e reiniciar");
+            Check(b != null && GameScanner.Fix(b) && deleted.SequenceEqual(new[] { "useplatformclock", "disabledynamictick" }), "BCD: consertar apaga exatamente os dois valores");
+            output = "Carregador de Inicialização do Windows\r\nidentificador           {current}\r\nuseplatformtick         Sim\r\nuseplatformclock        Não\r\n";
+            b = boot();
+            Check(b != null && b.Current == "useplatformtick, useplatformclock", "BCD: saída em português (\"Sim\", \"Não\") também é lida; qualquer valor presente é fora do padrão");
+            output = clean + "useplatformclockx       Yes\r\ntruncatememory          0x10000000\r\n";
+            Check(boot() == null, "BCD: outros valores (nomes parecidos, truncatememory) não são apontados nem apagados");
+            Check(!GameContext.System().DeleteBootValue("truncatememory") && !GameContext.System().DeleteBootValue("useplatformclock & calc"),
+                  "BCD: só os três valores de relógio podem virar argumento do bcdedit");
+        }
+
         // Segurança: serviços e políticas numa sandbox; a troca do tipo de inicialização é simulada no registro.
         using (var hklm = Registry.CurrentUser.CreateSubKey(TestKey + @"\Security\HKLM"))
         using (var hkcu = Registry.CurrentUser.CreateSubKey(TestKey + @"\Security\HKCU"))
@@ -963,6 +1026,20 @@ static class RealTests
             Check(gE != null && gE.Exes.Count == 1 && gE.Exes[0] == exeEpic, "Epic: LaunchExecutable do manifesto; manifesto com \"..\" é recusado");
             Check(!games.SelectMany(g => g.Exes).Any(e => e.EndsWith("RiotClientServices.exe") || e.Contains("Steamworks Shared") || e.Contains("nao-existe")),
                   "launchers, redistribuíveis da Steam e executáveis apagados ficam de fora");
+
+            // PC Game Pass: XboxGames\<jogo>\Content, com o gamelaunchhelper ao lado e uma junção que deve ser ignorada.
+            string xbox = Path.Combine(root, "XboxGames");
+            string forza = Path.Combine(xbox, @"Forza Horizon 5\Content\ForzaHorizon5.exe");
+            Write(forza);
+            Write(Path.Combine(xbox, @"Forza Horizon 5\Content\gamelaunchhelper.exe"));
+            Directory.CreateDirectory(Path.Combine(xbox, @"Sem Content\Outra"));
+            bool xboxJunction = Junction(Path.Combine(xbox, "Juncao"), Environment.SystemDirectory);
+            var xboxSources = new GameSources { Hkcu = Registry.CurrentUser.CreateSubKey(TestKey + @"\Gpu\XboxEmpty") };
+            xboxSources.XboxGamesRoots.Add(xbox);
+            var xboxGames = GameLibrary.Find(xboxSources);
+            Check(xboxGames.Count == 1 && xboxGames[0].Name == "Forza Horizon 5" && xboxGames[0].Store == "Xbox" && xboxGames[0].Exes.SequenceEqual(new[] { forza }),
+                  "PC Game Pass: jogo em XboxGames\\<jogo>\\Content com o executável real, sem o gamelaunchhelper, sem pasta sem Content" +
+                  (xboxJunction ? " e sem a junção" : " (junção não criada)") + " (achou " + string.Join(", ", xboxGames.Select(g => g.Name + ": " + string.Join(";", g.Exes.Select(Path.GetFileName)))) + ")");
 
             Check(GpuPreference.Get(hkcu, exeA) == GpuPreference.WindowsDecides, "sem valor: Windows decide");
             Check(GpuPreference.Set(hkcu, exeA, GpuPreference.HighPerformance) && GpuPreference.Get(hkcu, exeA) == GpuPreference.HighPerformance, "gravar alto desempenho");

@@ -171,11 +171,23 @@ pasta). Launchers (Steam, Epic, Riot Client, Battle.net) não entram.
 
 ### Para depois
 
-- **GPU dos jogos da Microsoft Store e do Game Pass.**
-- **`useplatformclock` / `disabledynamictick` no BCD:** forçar o HPET derruba o desempenho, e boosters
-  fazem isso. Ler o BCD exige administrador.
-- **Regras de limpeza para launchers:** caches web e logs do Epic Games, Battle.net e EA app (só caches,
-  nunca os jogos ou os downloads).
+Feito depois da 1.1.0 (seção `[Unreleased]` do CHANGELOG):
+
+- **Regras de limpeza para launchers:** cache e logs do Epic Games Launcher, Battle.net e EA app, logs do
+  Riot Client. Sem cookies, sessões, bancos de dados e pastas que exigem administrador.
+- **`boot-clock`:** `useplatformclock`, `useplatformtick` e `disabledynamictick` na entrada `{current}` do
+  BCD. Só aparece como administrador (ler o BCD exige). Como o `bcdedit` traduz os valores ("Sim"), qualquer
+  valor presente conta como fora do padrão; apagar é sempre seguro.
+- **`power-mode`:** recomendação, só em notebook com o Equilibrado ativo, quando o modo na tomada
+  (`ActiveOverlayAcPowerScheme`) não é `ded574b5…` (*Best performance*). GUIDs do artigo da Microsoft
+  "Customize the Windows performance power slider".
+- **PC Game Pass:** jogos em `X:\XboxGames\<jogo>\Content` entram na GPU dos jogos (executáveis comuns).
+
+Ainda em aberto:
+
+- **Jogos empacotados antigos da Store (`WindowsApps`):** a preferência de GPU deles não usa o caminho do
+  `.exe`, e não achei fonte confiável para o formato do nome do valor. Confirmar empiricamente (escolher um
+  app da Store em *Configurações > Elementos gráficos* e ler `UserGpuPreferences`) antes de implementar.
 
 ## Desenho
 
